@@ -10,13 +10,13 @@
 
 An intelligent, production-ready AI social platform that brings personalized chatbot experiences to WhatsApp and Telegram. Each user gets a unique identity with customizable AI personalities, making conversations feel truly human.
 ## 🔄 Recent Updates
+- **v3.3**: Hardened Security & Prompt Injection Detection 🛡️
+- **v3.3**: Graceful Error Handling & Privacy Guards
 - **v3.2**: AI Emotions & Personalized Memory System 🧠
 - **v3.2**: Real-time Cross-Platform Memory (WhatsApp ↔️ Telegram sync)
 - **v3.2**: Automatic Gender Adaptation & Mood Controls (`/mood`, `/gender`)
 - **v3.2**: Integrated Problem Reporting System (`/report`)
 - **v3.1**: Advanced Private Messaging (`/msg`, `/chat`, `/exit`)
-- **v3.1**: Platform-agnostic IPC Messaging via Outbox Queues
-- **v3.0**: Friend System (`/add_friend`, `/accept`, `/friends`)
 
 ## 🔗 Quick Links
 - [Technical Architecture](app/docs/system_architecture.md)
