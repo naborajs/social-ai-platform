@@ -1,4 +1,4 @@
-from database import register_user, verify_user, change_password, recover_account, change_username
+from app.core.database import register_user, verify_user, change_password, recover_account, change_username
 import sqlite3
 import os
 

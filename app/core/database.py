@@ -1,6 +1,6 @@
 import sqlite3
-import bcrypt
 import json
+import bcrypt
 from app.core.config import DB_NAME
 
 def init_db():
@@ -40,24 +40,63 @@ def init_db():
                     state TEXT,
                     data TEXT
                 )''')
+
+    # Friends table
+    c.execute('''CREATE TABLE IF NOT EXISTS friends (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user1_id INTEGER,
+                    user2_id INTEGER,
+                    status TEXT, -- 'pending', 'accepted'
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY(user1_id) REFERENCES users(id),
+                    FOREIGN KEY(user2_id) REFERENCES users(id)
+                )''')
+
+    # Groups table
+    c.execute('''CREATE TABLE IF NOT EXISTS groups (
+                    id TEXT PRIMARY KEY,
+                    name TEXT,
+                    created_by INTEGER,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY(created_by) REFERENCES users(id)
+                )''')
+
+    # Group Members table
+    c.execute('''CREATE TABLE IF NOT EXISTS group_members (
+                    group_id TEXT,
+                    user_id INTEGER,
+                    joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY(group_id, user_id),
+                    FOREIGN KEY(group_id) REFERENCES groups(id),
+                    FOREIGN KEY(user_id) REFERENCES users(id)
+                )''')
     
     # Migrations
     columns = [
         ("last_seen", "DATETIME DEFAULT CURRENT_TIMESTAMP"),
         ("recovery_key", "TEXT"),
-        ("email", "TEXT UNIQUE"),
+        ("email", "TEXT"),
         ("gemini_api_key", "TEXT"),
         ("display_name", "TEXT"),
         ("avatar_url", "TEXT"),
         ("bio", "TEXT"),
-        ("system_prompt", "TEXT")
+        ("system_prompt", "TEXT"),
+        ("uuid", "TEXT")
     ]
     
     for col_name, col_type in columns:
         try:
             c.execute(f"ALTER TABLE users ADD COLUMN {col_name} {col_type}")
+            conn.commit() # Commit each column add
         except sqlite3.OperationalError:
             pass # Column likely exists
+
+    # Ensure UUIDs exist for all users
+    import uuid
+    c.execute("SELECT id FROM users WHERE uuid IS NULL")
+    users_without_uuid = c.fetchall()
+    for (u_id,) in users_without_uuid:
+        c.execute("UPDATE users SET uuid = ? WHERE id = ?", (str(uuid.uuid4()), u_id))
 
     conn.commit()
     conn.close()
@@ -70,7 +109,8 @@ def register_user(username, email, password, platform=None, platform_id=None, av
     recovery_key = secrets.token_hex(8)
     
     try:
-        hashed = bcrypt.hash(password)
+        # Direct bcrypt usage
+        hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
         c.execute("INSERT INTO users (username, email, password_hash, recovery_key, avatar_url, bio) VALUES (?, ?, ?, ?, ?, ?)", 
                   (username, email, hashed, recovery_key, avatar_url, bio))
         user_id = c.lastrowid
@@ -81,15 +121,15 @@ def register_user(username, email, password, platform=None, platform_id=None, av
              c.execute("UPDATE users SET telegram_id = ? WHERE id = ?", (platform_id, user_id))
              
         conn.commit()
-        return True, f"✅ Registration successful!\nEmail: {email}\n🔑 **Backup Key**: `{recovery_key}`\n(Save this! Use `/recover <key> <new_pass>` if you forget your password.)"
+        return True, f"Registration successful!\nEmail: {email}\nBackup Key: {recovery_key}"
     except sqlite3.IntegrityError as e:
         if "users.username" in str(e):
-             return False, "❌ Username already exists."
+             return False, "Username already exists."
         elif "users.email" in str(e):
-             return False, "❌ Email already registered."
-        return False, f"❌ Registration failed: Duplicate entry."
+             return False, "Email already registered."
+        return False, f"Registration failed: Duplicate entry."
     except Exception as e:
-        return False, f"❌ Error: {e}"
+        return False, f"Error: {e}"
     finally:
         conn.close()
 
@@ -100,9 +140,9 @@ def update_system_prompt(user_id, system_prompt):
     try:
         c.execute("UPDATE users SET system_prompt = ? WHERE id = ?", (system_prompt, user_id))
         conn.commit()
-        return True, "✅ Persona updated successfully!"
+        return True, "Persona updated successfully!"
     except Exception as e:
-        return False, f"❌ Error updating persona: {e}"
+        return False, f"Error updating persona: {e}"
     finally:
         conn.close()
 
@@ -134,8 +174,10 @@ def verify_user(username, password):
     user = c.fetchone()
     conn.close()
     
-    if user and bcrypt.verify(password, user[1]):
-        return user[0] # Return user_id
+    if user:
+        # Direct bcrypt verification
+        if bcrypt.checkpw(password.encode('utf-8'), user[1].encode('utf-8')):
+            return user[0] # Return user_id
     return None
 
 def update_platform_id(user_id, platform, platform_id):
@@ -147,6 +189,52 @@ def update_platform_id(user_id, platform, platform_id):
         c.execute("UPDATE users SET telegram_id = ? WHERE id = ?", (platform_id, user_id))
     conn.commit()
     conn.close()
+
+def update_last_seen(user_id):
+    """Update the user's last activity timestamp."""
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("UPDATE users SET last_seen = CURRENT_TIMESTAMP WHERE id = ?", (user_id,))
+    conn.commit()
+    conn.close()
+
+def change_password(user_id, new_password):
+    """Securely update the user's password."""
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    hashed = bcrypt.hash(new_password)
+    c.execute("UPDATE users SET password_hash = ? WHERE id = ?", (hashed, user_id))
+    conn.commit()
+    conn.close()
+
+def change_username(user_id, new_username):
+    """Update the user's username if unique."""
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    try:
+        c.execute("UPDATE users SET username = ? WHERE id = ?", (new_username, user_id))
+        conn.commit()
+        return True, "✅ Username updated successfully!"
+    except sqlite3.IntegrityError:
+        return False, "❌ Username already exists."
+    finally:
+        conn.close()
+
+def recover_account(recovery_key, new_password):
+    """Recover account using recovery key and set new password."""
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("SELECT id FROM users WHERE recovery_key = ?", (recovery_key,))
+    user = c.fetchone()
+    if user:
+        user_id = user[0]
+        hashed = bcrypt.hash(new_password)
+        c.execute("UPDATE users SET password_hash = ? WHERE id = ?", (hashed, user_id))
+        conn.commit()
+        conn.close()
+        return True, "✅ Account recovered and password updated successfully!"
+    conn.close()
+    return False, "❌ Invalid recovery key."
 
 def set_api_key(user_id, api_key):
     """Set the user's personal Gemini API key."""
@@ -170,16 +258,6 @@ def get_user_api_key(user_id):
     conn.close()
     return result[0] if result else None
 
-def get_user_by_platform(platform, platform_id):
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    if platform == "whatsapp":
-        c.execute("SELECT id, username, gemini_api_key FROM users WHERE whatsapp_id = ?", (platform_id,))
-    elif platform == "telegram":
-        c.execute("SELECT id, username, gemini_api_key FROM users WHERE telegram_id = ?", (platform_id,))
-    user = c.fetchone()
-    conn.close()
-    return user # Returns (id, username, gemini_api_key)
 
 def log_conversation(user_id, message, response):
      conn = sqlite3.connect(DB_NAME)
@@ -220,6 +298,100 @@ def clear_state(platform_id):
     c.execute("DELETE FROM user_states WHERE platform_id = ?", (platform_id,))
     conn.commit()
     conn.close()
+
+# --- Social Functions ---
+
+def send_friend_request(from_id, to_username):
+    """Send a friend request by username."""
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("SELECT id FROM users WHERE username = ?", (to_username,))
+    to_user = c.fetchone()
+    if not to_user:
+        return False, "❌ User not found."
+    to_id = to_user[0]
+    if from_id == to_id:
+        return False, "❌ You cannot friend yourself."
+    
+    try:
+        c.execute("INSERT INTO friends (user1_id, user2_id, status) VALUES (?, ?, 'pending')", (from_id, to_id))
+        conn.commit()
+        return True, f"✅ Friend request sent to {to_username}!"
+    except Exception as e:
+        return False, f"❌ Error: {e}"
+    finally:
+        conn.close()
+
+def get_friend_requests(user_id):
+    """List pending friend requests."""
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute('''SELECT users.username FROM friends 
+                 JOIN users ON friends.user1_id = users.id 
+                 WHERE friends.user2_id = ? AND friends.status = 'pending' ''', (user_id,))
+    requests = [r[0] for r in c.fetchall()]
+    conn.close()
+    return requests
+
+def accept_friend_request(user_id, from_username):
+    """Accept a pending friend request."""
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("SELECT id FROM users WHERE username = ?", (from_username,))
+    from_user = c.fetchone()
+    if not from_user:
+        return False, "❌ User not found."
+    from_id = from_user[0]
+    
+    c.execute("UPDATE friends SET status = 'accepted' WHERE user1_id = ? AND user2_id = ? AND status = 'pending'", (from_id, user_id))
+    if c.rowcount > 0:
+        conn.commit()
+        conn.close()
+        return True, f"✅ You are now friends with {from_username}!"
+    conn.close()
+    return False, "❌ No pending request from that user."
+
+def get_friends(user_id):
+    """List all accepted friends."""
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute('''SELECT username FROM users WHERE id IN (
+                    SELECT user2_id FROM friends WHERE user1_id = ? AND status = 'accepted'
+                    UNION
+                    SELECT user1_id FROM friends WHERE user2_id = ? AND status = 'accepted'
+                 )''', (user_id, user_id))
+    friends = [f[0] for f in c.fetchall()]
+    conn.close()
+    return friends
+
+def create_group(name, creator_id):
+    """Create a new group."""
+    import uuid
+    group_id = str(uuid.uuid4())[:8]
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("INSERT INTO groups (id, name, created_by) VALUES (?, ?, ?)", (group_id, name, creator_id))
+    c.execute("INSERT INTO group_members (group_id, user_id) VALUES (?, ?)", (group_id, creator_id))
+    conn.commit()
+    conn.close()
+    return group_id
+
+def join_group(group_id, user_id):
+    """Join an existing group."""
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("SELECT name FROM groups WHERE id = ?", (group_id,))
+    group = c.fetchone()
+    if not group:
+        return False, "❌ Group not found."
+    try:
+        c.execute("INSERT INTO group_members (group_id, user_id) VALUES (?, ?)", (group_id, user_id))
+        conn.commit()
+        return True, f"✅ Joined group: {group[0]}"
+    except sqlite3.IntegrityError:
+        return False, "❌ You are already a member of this group."
+    finally:
+        conn.close()
 
 # Initialize on import
 init_db()

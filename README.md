@@ -9,8 +9,16 @@
 [![Telegram](https://img.shields.io/badge/Telegram-Supported-26A5E4?logo=telegram)](https://telegram.org/)
 
 An intelligent, production-ready AI social platform that brings personalized chatbot experiences to WhatsApp and Telegram. Each user gets a unique identity with customizable AI personalities, making conversations feel truly human.
+## 🔄 Recent Updates
+- **v3.0**: Added Friend System (`/add_friend`, `/accept`, `/friends`)
+- **v3.0**: Added Group Chat Support (`/create_group`, `/join`)
+- **v3.0**: Enhanced Security with per-user UUIDs and bcrypt encryption
+- **v3.0**: Comprehensive Technical Documentation in `app/docs/`
 
----
+## 🔗 Quick Links
+- [Technical Architecture](app/docs/system_architecture.md)
+- [Documentation Wiki](https://github.com/naborajs/social-ai-platform/wiki)
+- [Report a Bug](https://github.com/naborajs/social-ai-platform/issues)
 
 ## 🌟 Key Features
 
@@ -40,12 +48,17 @@ No complex commands! Registration is conversational:
 - ✅ Telegram (via python-telegram-bot)
 - 📱 Unified backend for both platforms
 
+### 👥 **Social Features**
+- **Friend System**: `/add_friend`, `/friends`, `/accept`
+- **Group Chats**: `/create_group`, `/join`
+- **Unified Profiles**: Cross-platform identity synchronization
+
 ### 🎨 **Social-Ready Features**
 - Unique user profiles with avatars
 - Email & username uniqueness
 - Conversation history logging
 - Activity tracking (last seen)
-- Expandable for future social features
+- **Technical Documentation**: [System Architecture](app/docs/system_architecture.md)
 
 ---
 

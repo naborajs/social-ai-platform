@@ -1,5 +1,5 @@
 import os
-from llm_handler import GeminiHandler
+from app.features.llm_handler import GeminiHandler
 from dotenv import load_dotenv
 
 load_dotenv()

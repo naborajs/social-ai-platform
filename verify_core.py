@@ -1,8 +1,10 @@
-from bot_core import UnifiedBot, register_user, verify_user
+from app.core.bot_core import UnifiedBot
+from app.core.database import register_user, verify_user
+
 import os
 
 def verify_core_logic():
-    print("🧪 Testing Core Logic...")
+    print("[+] Testing Core Logic...")
     
     # Clean up test user if exists
     if os.path.exists("bot_data.db"):
@@ -11,18 +13,18 @@ def verify_core_logic():
     test_user = "test_user_1"
     test_pass = "password123"
     
-    print(f"👉 Registering {test_user}...")
+    print(f"-> Registering {test_user}...")
     success, msg = register_user(test_user, test_pass, "whatsapp", "123456789")
     print(f"Result: {msg}")
     
-    print(f"👉 Verifying login for {test_user}...")
+    print(f"-> Verifying login for {test_user}...")
     user_id = verify_user(test_user, test_pass)
     if user_id:
         print(f"✅ Login verified! User ID: {user_id}")
     else:
         print("❌ Login failed (might be expected if already registered differently or error).")
 
-    print("\n🤖 Testing Bot Message Flow...")
+    print("\n[Bot] Testing Bot Message Flow...")
     bot = UnifiedBot()
     
     # Test unauthenticated

@@ -1,5 +1,5 @@
-from main import ChatBot
-from love_calculator import LoveCalculator
+from app.core.chatbot import ChatBot
+from app.features.love_calculator import LoveCalculator
 
 def verify():
     print("Testing Love Calculator...")

@@ -1,4 +1,4 @@
-from media_handler import create_sticker, create_gif
+from app.features.media_handler import create_sticker, create_gif
 from PIL import Image
 import os
 import time

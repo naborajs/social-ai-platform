@@ -89,6 +89,51 @@ class UnifiedBot:
                   username = message_parts[1] # Update local context
              return msg
         
+        # --- Social Controls ---
+        
+        if command == "/add_friend":
+            if len(message_parts) < 2:
+                return "❌ Usage: `/add_friend <username>`"
+            from app.core.database import send_friend_request
+            success, msg = send_friend_request(user_id, message_parts[1])
+            return msg
+
+        if command == "/friend_requests":
+            from app.core.database import get_friend_requests
+            requests = get_friend_requests(user_id)
+            if not requests:
+                return "📩 No pending friend requests."
+            return "📩 **Pending Friend Requests**:\n" + "\n".join([f"• {r}" for r in requests]) + "\n\nUse `/accept <username>` to become friends."
+
+        if command == "/accept":
+            if len(message_parts) < 2:
+                return "❌ Usage: `/accept <username>`"
+            from app.core.database import accept_friend_request
+            success, msg = accept_friend_request(user_id, message_parts[1])
+            return msg
+
+        if command == "/friends":
+            from app.core.database import get_friends
+            friends = get_friends(user_id)
+            if not friends:
+                return "👥 You haven't added any friends yet. Try `/add_friend <username>`!"
+            return "👥 **Your Friends**:\n" + "\n".join([f"• {f}" for f in friends])
+
+        if command == "/create_group":
+            if len(message_parts) < 2:
+                return "❌ Usage: `/create_group <group_name>`"
+            from app.core.database import create_group
+            name = " ".join(message_parts[1:])
+            g_id = create_group(name, user_id)
+            return f"🎨 Group **{name}** created! Invite others with ID: `{g_id}`\n\nUse `/join <group_id>` to enter."
+
+        if command == "/join":
+            if len(message_parts) < 2:
+                return "❌ Usage: `/join <group_id>`"
+            from app.core.database import join_group
+            success, msg = join_group(message_parts[1], user_id)
+            return msg
+
         # Update Activity
         from app.core.database import update_last_seen
         update_last_seen(user_id)
