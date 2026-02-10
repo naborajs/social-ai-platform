@@ -37,10 +37,10 @@ class ChatBot:
         self.love_calculator = LoveCalculator()
         try:
             self.llm_handler = GeminiHandler()
-            print(f"{Fore.GREEN}✅ Gemini API Connected!{Style.RESET_ALL}")
+            print("INFO: Gemini API Connected!")
         except Exception as e:
             self.llm_handler = None
-            print(f"{Fore.RED}⚠️ Gemini API not connected: {e}{Style.RESET_ALL}")
+            print(f"WARN: Gemini API not connected: {e}")
         
     def _initialize_knowledge_base(self) -> Dict[str, List[str]]:
         """Initialize the knowledge base with common topics."""
@@ -230,7 +230,7 @@ class ChatBot:
             self.error_count += 1
             return "❌ Error processing math: Something unexpected happened!"
     
-    def generate_response(self, user_input: str, user_api_key: Optional[str] = None, system_instruction: Optional[str] = None) -> str:
+    def generate_response(self, user_input: str, user_api_key: Optional[str] = None, system_instruction: Optional[str] = None, history: list = None) -> str:
         """Generate an appropriate response based on user input."""
         try:
             if not user_input:
@@ -242,7 +242,9 @@ class ChatBot:
 
             # Use Gemini for all other responses
             if self.llm_handler:
-                return self.llm_handler.generate_response(user_input, user_api_key=user_api_key, system_instruction=system_instruction)
+                return self.llm_handler.generate_response(user_input, user_api_key=user_api_key, 
+                                                         system_instruction=system_instruction,
+                                                         history=history)
             
             # Fallback if LLM is not available
             intent, confidence = self.extract_intent(user_input)

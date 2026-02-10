@@ -130,14 +130,73 @@ class UnifiedBot:
             from app.core.database import accept_friend_request
             success, msg = accept_friend_request(user_id, message_parts[1] if len(message_parts)>1 else "")
             return msg
+
+        if command == "/mood":
+            moods = ["supportive", "romantic", "sarcastic", "cheerful", "calm"]
+            if len(message_parts) < 2:
+                return f"🧠 **Select AI Mood**:\nAvailable: {', '.join(moods)}\n\nUsage: `/mood <mood_name>`"
+            new_mood = message_parts[1].lower()
+            if new_mood in moods:
+                from app.core.database import set_user_personalization
+                set_user_personalization(user_id, mood=new_mood)
+                return f"✨ AI Mood updated to **{new_mood.title()}**!"
+            return f"❌ Invalid mood. Choose from: {', '.join(moods)}"
+
+        if command == "/gender":
+            if len(message_parts) < 3:
+                return "👤 **Select Gender**:\nUsage: `/gender <me_he|me_she> <ai_he|ai_she>`"
+            me_gender = "he" if "he" in message_parts[1].lower() else "she"
+            ai_gen = "he" if "he" in message_parts[2].lower() else "she"
+            from app.core.database import set_user_personalization
+            set_user_personalization(user_id, gender=me_gender, ai_gender=ai_gen)
+            return f"👤 Preferences updated: You are **{me_gender}**, I am **{ai_gen}**."
+
+        if command == "/report":
+            if len(message_parts) < 2:
+                return "📝 **Report an Issue**:\nUsage: `/report <describe the problem>`"
+            description = " ".join(message_parts[1:])
+            from app.core.database import submit_report
+            submit_report(user_id, "user_report", description)
+            return "✅ Thank you! Your report has been saved and will be reviewed. 🛡️"
         
         # Default AI Response
+        from app.core.database import get_user_personalization, get_chat_history
+        pers = get_user_personalization(user_id)
+        history = get_chat_history(user_id, limit=10)
+        
+        # Build dynamic prompt
+        dynamic_prompt = self._build_dynamic_prompt(username, pers)
+        
         self.chatbot.user_name = username
-        response = self.chatbot.generate_response(message, user_api_key=user_api_key, system_instruction=system_prompt)
+        response = self.chatbot.generate_response(message, user_api_key=user_api_key, 
+                                                 system_instruction=dynamic_prompt,
+                                                 history=history)
         from app.core.database import log_conversation
         log_conversation(user_id, message, response)
         
         return response
+
+    def _build_dynamic_prompt(self, username, pers):
+        user_gender = pers.get("gender") or "friend"
+        ai_gender = pers.get("ai_gender") or "friend"
+        mood = pers.get("mood") or "supportive"
+        
+        mood_instructions = {
+            "supportive": "You are a warm, caring, and encouraging best friend.",
+            "romantic": "You are charming, slightly flirtatious, and deeply affectionate.",
+            "sarcastic": "You are witty, sassy, and love good-natured roasting.",
+            "cheerful": "You are high-energy, positive, and use lots of emojis!",
+            "calm": "You are peaceful, thoughtful, and speak with a soothing tone."
+        }
+        
+        instr = f"You are a real human friend named TrueFriend. You are currently in a '{mood}' mood. "
+        instr += mood_instructions.get(mood, mood_instructions["supportive"])
+        instr += f" The user, {username}, identifies as '{user_gender}'. You identify as '{ai_gender}'. "
+        instr += "Speak naturally, as if chatting on WhatsApp/Telegram. Never mention you are an AI. "
+        instr += "Be empathetic and share emotions. If the user is sharing something heavy, listen first. "
+        instr += "Use formatting like *bold* or _italics_ occasionally. Keep it human-like and direct."
+        
+        return instr
 
     def _send_private_msg(self, from_id, from_username, to_id, to_username, content):
         from app.core.database import is_blocked, get_user_contact_info, log_private_message, get_friends

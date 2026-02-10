@@ -91,6 +91,16 @@ def init_db():
                     FOREIGN KEY(from_id) REFERENCES users(id),
                     FOREIGN KEY(to_id) REFERENCES users(id)
                 )''')
+
+    # Reports table
+    c.execute('''CREATE TABLE IF NOT EXISTS reports (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER,
+                    type TEXT,
+                    description TEXT,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY(user_id) REFERENCES users(id)
+                )''')
     
     # Migrations
     columns = [
@@ -104,7 +114,10 @@ def init_db():
         ("system_prompt", "TEXT"),
         ("uuid", "TEXT"),
         ("preferred_platform", "TEXT DEFAULT 'whatsapp'"),
-        ("active_chat_id", "INTEGER") # For context-based chatting
+        ("active_chat_id", "INTEGER"), # For context-based chatting
+        ("gender", "TEXT"), # user's gender
+        ("ai_gender", "TEXT"), # AI's preferred gender
+        ("ai_mood", "TEXT DEFAULT 'supportive'") # current AI mood
     ]
     
     for col_name, col_type in columns:
@@ -425,6 +438,47 @@ def join_group(group_id, user_id):
         return False, "❌ You are already a member of this group."
     finally:
         conn.close()
+
+def set_user_personalization(user_id, gender=None, ai_gender=None, mood=None):
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    if gender:
+        c.execute("UPDATE users SET gender = ? WHERE id = ?", (gender, user_id))
+    if ai_gender:
+        c.execute("UPDATE users SET ai_gender = ? WHERE id = ?", (ai_gender, user_id))
+    if mood:
+        c.execute("UPDATE users SET ai_mood = ? WHERE id = ?", (mood, user_id))
+    conn.commit()
+    conn.close()
+
+def get_user_personalization(user_id):
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("SELECT gender, ai_gender, ai_mood FROM users WHERE id = ?", (user_id,))
+    res = c.fetchone()
+    conn.close()
+    if res:
+        return {"gender": res[0], "ai_gender": res[1], "mood": res[2]}
+    return {"gender": None, "ai_gender": None, "mood": "supportive"}
+
+def submit_report(user_id, report_type, description):
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("INSERT INTO reports (user_id, type, description) VALUES (?, ?, ?)", (user_id, report_type, description))
+    conn.commit()
+    conn.close()
+
+def get_chat_history(user_id, limit=15):
+    """Retrieve recent conversation history for cross-platform memory."""
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute('''SELECT message, response FROM conversations 
+                 WHERE user_id = ? 
+                 ORDER BY timestamp DESC LIMIT ?''', (user_id, limit))
+    history = c.fetchall()
+    conn.close()
+    # Return in chronological order
+    return history[::-1]
 
 # Initialize on import
 init_db()

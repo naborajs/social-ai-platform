@@ -12,6 +12,7 @@ class ConversationManager:
     STATE_REG_USERNAME = "REG_USERNAME"
     STATE_REG_EMAIL = "REG_EMAIL"
     STATE_REG_PASSWORD = "REG_PASSWORD"
+    STATE_REG_GENDER = "REG_GENDER"
     STATE_REG_AVATAR = "REG_AVATAR"
     STATE_REG_PERSONA = "REG_PERSONA"
     
@@ -72,6 +73,15 @@ class ConversationManager:
                 return "❌ Password must be at least 6 characters. Try again:", None, False
                 
             data['password'] = text
+            set_state(platform_id, platform, self.STATE_REG_GENDER, data)
+            return "👤 What is your **Gender**? (he/she)\nThis helps me tailor my style for you.", None, False
+
+        elif state == self.STATE_REG_GENDER:
+            gender = "she" if "she" in text.lower() else "he"
+            data['gender'] = gender
+            # Auto-align AI gender with user gender
+            data['ai_gender'] = gender
+            
             set_state(platform_id, platform, self.STATE_REG_AVATAR, data)
             
             # Show Avatar Options
@@ -123,13 +133,22 @@ class ConversationManager:
             # Let's use `update_system_prompt` but we need `user_id`. `register_user` doesn't return `user_id`.
             # We can get user by platform_id immediately.
             
-            from app.core.database import get_user_by_platform
+            from app.core.database import get_user_by_platform, set_user_personalization
             user = get_user_by_platform(platform, platform_id)
             if user:
                 update_system_prompt(user[0], system_prompt)
+                set_user_personalization(user[0], gender=data.get('gender'), ai_gender=data.get('ai_gender'))
             
             clear_state(platform_id)
-            return msg + "\n\n🎉 Setup Complete! backend updated.", None, True
+            
+            onboarding_msg = msg + "\n\n🎉 **Setup Complete!**\n\n"
+            onboarding_msg += "💡 **Quick Tips**:\n"
+            onboarding_msg += "• Type `/mood` to change my tone of voice.\n"
+            onboarding_msg += "• Type `/report <msg>` if something isn't working.\n"
+            onboarding_msg += "• You can always change genders with `/gender <me> <ai>`.\n\n"
+            onboarding_msg += "How are you feeling today?"
+            
+            return onboarding_msg, None, True
 
         return None, None, False
 

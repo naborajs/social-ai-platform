@@ -26,7 +26,7 @@ class GeminiHandler:
             print(f"❌ Error configuring Gemini model: {e}")
             self.model = None
 
-    def generate_response(self, user_input: str, user_api_key: Optional[str] = None, system_instruction: Optional[str] = None) -> str:
+    def generate_response(self, user_input: str, user_api_key: Optional[str] = None, system_instruction: Optional[str] = None, history: list = None) -> str:
         """Generate a response using the Gemini model."""
         
         # Use user-specific key if provided, else fallback to instance key
@@ -38,34 +38,22 @@ class GeminiHandler:
         # Default instruction if none provided
         default_instruction = "You are a real human friend. You are direct, truthful, and honest. You do not use flowery language or act like a robot. You speak casually, use slang occasionally if appropriate, and always tell the truth, even if it's blunt. You are NOT an AI assistant, you are a friend hanging out. Keep responses concise unless asked for details."
         active_instruction = system_instruction or default_instruction
+ 
+        # Convert DB history to Gemini format
+        gemini_history = []
+        if history:
+            for msg, res in history:
+                gemini_history.append({"role": "user", "parts": [msg]})
+                gemini_history.append({"role": "model", "parts": [res]})
 
-        # Re-configure if key is different or if specific instruction is needed (simulating new session for persona)
-        # Note: Ideally we cache models per persona/key. For now, we instantiate for the request if persona changes.
-        
-        model = self.model
-        chat = self.chat_session
-
-        # Logic to determine if we need a fresh model instance
-        # If user provides a custom key OR a custom instruction, we should probably start fresh or use a temp model
-        if (user_api_key and user_api_key != self.api_key) or system_instruction:
-             try:
-                 genai.configure(api_key=active_key)
-                 model = genai.GenerativeModel(
-                    model_name='gemini-2.0-flash',
-                    system_instruction=active_instruction
-                 )
-                 # New chat for this turn (stateless for now, or we'd need to load history)
-                 chat = model.start_chat(history=[])
-             except Exception as e:
-                 return f"❌ Error configuring custom model: {e}"
-
-        if not model:
-             self._configure_model(active_key)
-             model = self.model
-             chat = self.chat_session
-             
         try:
-             # If using temp chat, send message
+            genai.configure(api_key=active_key)
+            model = genai.GenerativeModel(
+                model_name='gemini-2.0-flash',
+                system_instruction=active_instruction
+            )
+            # Start chat with provided history
+            chat = model.start_chat(history=gemini_history)
             response = chat.send_message(user_input)
             return response.text
         except Exception as e:
