@@ -6,18 +6,19 @@ from app.features.llm_handler import GeminiHandler
 from app.core.config import GOOGLE_API_KEY
 
 class UnifiedBot:
-    def __init__(self):
+    def __init__(self, outbox_queue=None):
         self.chatbot = ChatBot()
         # Override chatbot name/version if needed
         self.chatbot.name = "TrueFriend"
-        self.chatbot.version = "3.0"
+        self.chatbot.version = "3.1"
         self.conv_manager = ConversationManager()
+        self.outbox_queue = outbox_queue
         
     def handle_message(self, message, platform, platform_id):
-        # 1. Check Active Conversation State First
+        # 1. Check Active Conversation State First (Registration/Onboarding)
         response, options, is_complete = self.conv_manager.handle_input(platform_id, platform, message)
         if response:
-            return response # Return immediate response from flow
+            return response 
             
         user_data = get_user_by_platform(platform, platform_id)
         
@@ -28,7 +29,6 @@ class UnifiedBot:
         if command == "/register" or command == "/start":
             if user_data:
                 return "✅ You are already registered! Just start chatting."
-            # Start Interactive Flow
             return self.conv_manager.start_registration(platform_id, platform)
             
         elif command == "/login":
@@ -39,111 +39,138 @@ class UnifiedBot:
                 update_platform_id(user_id, platform, platform_id)
                 from app.core.database import update_last_seen
                 update_last_seen(user_id)
-                return f"✅ Login successful! Welcome back, {message_parts[1]}. 👋\n\n💡 **Tip**: Set your own Gemini API Key for privacy using:\n`/set_key <your_api_key>`"
+                return f"✅ Login successful! Welcome back, {message_parts[1]}. 👋"
             else:
                 return "❌ Invalid username or password."
 
-        elif command == "/recover":
-            if len(message_parts) < 3:
-                 return "❌ Usage: `/recover <key> <new_password>`"
-            from app.core.database import recover_account
-            success, msg = recover_account(message_parts[1], message_parts[2])
-            return msg
-
         if not user_data:
-            return "🔒 **Authentication Required**\n\nPlease log in or register to chat:\n\n🆕 `/register` (Interactive Setup)\n🔑 `/login <username> <password>`"
+            return "🔒 **Authentication Required**\n\nPlease `/register` or `/login` to start."
         
         # Authenticated User Logic
-        # user_data structure: (id, username, gemini_api_key, system_prompt)
         user_id = user_data[0]
         username = user_data[1]
         user_api_key = user_data[2]
         system_prompt = user_data[3]
         
-        # System Commands
-        if command == "/set_key":
-             if len(message_parts) < 2:
-                  return "❌ Usage: `/set_key <your_gemini_api_key>`"
-             success, msg = set_api_key(user_id, message_parts[1])
-             return msg
+        from app.core.database import update_last_seen, get_active_chat, set_active_chat, is_blocked, get_user_contact_info, log_private_message
+        update_last_seen(user_id)
 
-        if command == "/my_key":
-             if user_api_key:
-                 return f"🔑 Your API Key is set: `...{user_api_key[-4:]}`"
-             else:
-                 return "❌ You haven't set a custom API Key yet."
+        # --- Active Chat Context (Tunneling) ---
+        active_chat_id = get_active_chat(user_id)
+        if active_chat_id and command != "/exit":
+            # Check if still friends and not blocked
+            # tunnel message to active_chat_id
+            from app.core.database import get_user_by_id
+            target_user = get_user_by_id(active_chat_id) # Need to implement this
+            if target_user:
+                 t_username = target_user['username']
+                 self._send_private_msg(user_id, username, active_chat_id, t_username, message)
+                 return None # Silent return as message is dispatched
 
-        if command == "/change_password":
-             if len(message_parts) < 2:
-                  return "❌ Usage: `/change_password <new_password>`"
-             from app.core.database import change_password
-             change_password(user_id, message_parts[1])
-             return "✅ Password updated successfully!"
-             
-        if command == "/change_username":
-             if len(message_parts) < 2:
-                  return "❌ Usage: `/change_username <new_username>`"
-             from app.core.database import change_username
-             success, msg = change_username(user_id, message_parts[1])
-             if success: 
-                  username = message_parts[1] # Update local context
-             return msg
+        # --- Commands ---
         
-        # --- Social Controls ---
-        
-        if command == "/add_friend":
+        if command == "/msg":
+            if len(message_parts) < 3:
+                return "❌ Usage: `/msg <username> <message>`"
+            target_username = message_parts[1]
+            content = " ".join(message_parts[2:])
+            target_info = get_user_contact_info(target_username)
+            if not target_info:
+                return f"❌ User '{target_username}' not found."
+            
+            return self._send_private_msg(user_id, username, target_info['id'], target_username, content)
+
+        if command == "/chat":
             if len(message_parts) < 2:
-                return "❌ Usage: `/add_friend <username>`"
-            from app.core.database import send_friend_request
-            success, msg = send_friend_request(user_id, message_parts[1])
+                return "❌ Usage: `/chat <username>`"
+            target_username = message_parts[1]
+            target_info = get_user_contact_info(target_username)
+            if not target_info:
+                return f"❌ User '{target_username}' not found."
+            
+            set_active_chat(user_id, target_info['id'])
+            return f"🤝 **Chat Started with {target_username}**\nAI is now offline. Only {target_username} will see your messages.\n\nType `/exit` to return to AI mode."
+
+        if command == "/exit":
+            set_active_chat(user_id, None)
+            return "🤖 **AI Mode Reactivated**\nWelcome back! How can I help you today?"
+
+        if command == "/block":
+            if len(message_parts) < 2: return "❌ Usage: `/block <username>`"
+            from app.core.database import block_user
+            success, msg = block_user(user_id, message_parts[1])
             return msg
 
-        if command == "/friend_requests":
-            from app.core.database import get_friend_requests
-            requests = get_friend_requests(user_id)
-            if not requests:
-                return "📩 No pending friend requests."
-            return "📩 **Pending Friend Requests**:\n" + "\n".join([f"• {r}" for r in requests]) + "\n\nUse `/accept <username>` to become friends."
+        if command == "/unblock":
+            if len(message_parts) < 2: return "❌ Usage: `/unblock <username>`"
+            from app.core.database import unblock_user
+            success, msg = unblock_user(user_id, message_parts[1])
+            return msg
 
-        if command == "/accept":
-            if len(message_parts) < 2:
-                return "❌ Usage: `/accept <username>`"
-            from app.core.database import accept_friend_request
-            success, msg = accept_friend_request(user_id, message_parts[1])
+        if command == "/set_notify":
+             if len(message_parts) < 2 or message_parts[1].lower() not in ["wa", "tg", "whatsapp", "telegram"]:
+                 return "❌ Usage: `/set_notify <wa|tg>`"
+             plat = "whatsapp" if message_parts[1].lower() in ["wa", "whatsapp"] else "telegram"
+             from app.core.database import set_preferred_platform
+             set_preferred_platform(user_id, plat)
+             return f"✅ Notifications will now be sent to your **{plat.title()}** account."
+
+        # Re-use existing friend/group commands
+        if command == "/add_friend":
+            from app.core.database import send_friend_request
+            success, msg = send_friend_request(user_id, message_parts[1] if len(message_parts)>1 else "")
             return msg
 
         if command == "/friends":
             from app.core.database import get_friends
             friends = get_friends(user_id)
-            if not friends:
-                return "👥 You haven't added any friends yet. Try `/add_friend <username>`!"
-            return "👥 **Your Friends**:\n" + "\n".join([f"• {f}" for f in friends])
+            return "👥 **Friends**:\n" + "\n".join([f"• {f}" for f in friends]) if friends else "👥 No friends yet."
 
-        if command == "/create_group":
-            if len(message_parts) < 2:
-                return "❌ Usage: `/create_group <group_name>`"
-            from app.core.database import create_group
-            name = " ".join(message_parts[1:])
-            g_id = create_group(name, user_id)
-            return f"🎨 Group **{name}** created! Invite others with ID: `{g_id}`\n\nUse `/join <group_id>` to enter."
-
-        if command == "/join":
-            if len(message_parts) < 2:
-                return "❌ Usage: `/join <group_id>`"
-            from app.core.database import join_group
-            success, msg = join_group(message_parts[1], user_id)
+        if command == "/accept":
+            from app.core.database import accept_friend_request
+            success, msg = accept_friend_request(user_id, message_parts[1] if len(message_parts)>1 else "")
             return msg
-
-        # Update Activity
-        from app.core.database import update_last_seen
-        update_last_seen(user_id)
         
-        self.chatbot.user_name = username # Set context for the chatbot
-        
-        # Pass user_api_key and system_prompt to generate_response
+        # Default AI Response
+        self.chatbot.user_name = username
         response = self.chatbot.generate_response(message, user_api_key=user_api_key, system_instruction=system_prompt)
-        
-        # Log conversation
+        from app.core.database import log_conversation
         log_conversation(user_id, message, response)
         
         return response
+
+    def _send_private_msg(self, from_id, from_username, to_id, to_username, content):
+        from app.core.database import is_blocked, get_user_contact_info, log_private_message, get_friends
+        
+        # Permission checks
+        if is_blocked(from_id, to_id):
+            return "❌ You are blocked by this user."
+        
+        friends = get_friends(from_id)
+        if to_username not in friends:
+            return "❌ You can only message your friends."
+
+        target_info = get_user_contact_info(to_username)
+        pref_plat = target_info['preferred_platform']
+        plat_id = target_info['whatsapp_id'] if pref_plat == 'whatsapp' else target_info['telegram_id']
+        
+        if not plat_id:
+            # Fallback to other platform if preferred not linked
+            pref_plat = 'telegram' if pref_plat == 'whatsapp' else 'whatsapp'
+            plat_id = target_info['whatsapp_id'] if pref_plat == 'whatsapp' else target_info['telegram_id']
+        
+        if not plat_id:
+            return f"❌ {to_username} has not linked their {pref_plat} account."
+
+        # Dispatch via Queue
+        if self.outbox_queue:
+            payload = {
+                "platform": pref_plat,
+                "target": plat_id,
+                "text": f"🔒 **Private Message from {from_username}**:\n{content}"
+            }
+            self.outbox_queue.put(payload)
+            log_private_message(from_id, to_id, content)
+            return f"📤 Message sent to {to_username}!"
+        
+        return "❌ Messaging system temporarily unavailable."

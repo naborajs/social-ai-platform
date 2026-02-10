@@ -10,14 +10,42 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-def run_whatsapp_bot():
+import threading
+
+def run_whatsapp_bot(outbox_queue):
     print("🚀 Starting WhatsApp Bot (Unified)...")
     
-    # Initialize Unified Bot
-    bot_core = UnifiedBot()
+    # Initialize Unified Bot with Queue for IPC
+    bot_core = UnifiedBot(outbox_queue)
 
     # Initialize Neonize Client
     client = NewClient("whatsapp_session.sqlite3")
+
+    def queue_listener():
+        """Thread to listen for cross-platform messages destined for WhatsApp."""
+        while True:
+            try:
+                # We check the queue for messages
+                if not outbox_queue.empty():
+                    item = outbox_queue.get()
+                    if item.get("platform") == "whatsapp":
+                        target = item.get("target")
+                        text = item.get("text")
+                        if target and text:
+                            print(f"📥 IPC -> WhatsApp: Sending to {target}")
+                            client.send_message(target, text)
+                    else:
+                        # Put it back if not for us, wait a bit
+                        outbox_queue.put(item)
+                        time.sleep(0.5)
+                time.sleep(1)
+            except Exception as e:
+                print(f"❌ WhatsApp Queue Listener Error: {e}")
+                time.sleep(2)
+
+    # Start Queue Listener Thread
+    listener_thread = threading.Thread(target=queue_listener, daemon=True)
+    listener_thread.start()
 
     # Initialize Engagement Scheduler
     # We import here to avoid circular dependencies if any, or just to keep scope clean
@@ -66,20 +94,12 @@ def run_whatsapp_bot():
 
             sender = chat_info.RemoteJid
 
-            # Handle Image Message
+            # Handle Media
             if original_msg.imageMessage:
-                print(f"📷 Image received from {sender}")
-                try:
-                     print("⚠️ Media download implementation requires manual verification of neonize docs.")
-                     client.send_message(sender, "🤖 Image received! Sticker conversion coming soon.")
-                except Exception as e:
-                    print(f"❌ Error handling image: {e}")
+                client.send_message(sender, "🤖 Image received!")
                 return
-
-            # Handle Video Message
             if original_msg.videoMessage:
-                 print(f"🎥 Video received from {sender}")
-                 client.send_message(sender, "🤖 Video received! GIF conversion coming soon.")
+                 client.send_message(sender, "🤖 Video received!")
                  return
 
             # Extract text content
@@ -92,10 +112,10 @@ def run_whatsapp_bot():
 
             # Process message via UnifiedBot
             response_text = bot_core.handle_message(text, "whatsapp", sender)
-            print(f"📤 Replying: {response_text}")
-
-            # Send response
-            client.send_message(sender, response_text)
+            
+            if response_text:
+                print(f"📤 Replying: {response_text}")
+                client.send_message(sender, response_text)
 
         except Exception as e:
             print(f"❌ Error processing message: {e}")

@@ -18,30 +18,33 @@ try:
 except AttributeError:
     pass
 
-def start_whatsapp():
+def start_whatsapp(queue):
     """Function to run WhatsApp bot in a separate process."""
     try:
         from app.bots.whatsapp_bot import run_whatsapp_bot
-        run_whatsapp_bot()
+        run_whatsapp_bot(queue)
     except Exception as e:
         print(f"{Fore.RED}❌ WhatsApp Bot Crashed: {e}{Style.RESET_ALL}")
 
-def start_telegram():
+def start_telegram(queue):
     """Function to run Telegram bot in a separate process."""
     try:
         from app.bots.telegram_bot import run_telegram_bot
-        run_telegram_bot()
+        run_telegram_bot(queue)
     except Exception as e:
         print(f"{Fore.RED}❌ Telegram Bot Crashed: {e}{Style.RESET_ALL}")
 
 def main():
     print(f"{Fore.CYAN}="*50)
-    print(f"{Fore.YELLOW}🚀 Starting Unified Bot System...{Style.RESET_ALL}")
+    print(f"{Fore.YELLOW}🚀 Starting Unified Bot System v3.1...{Style.RESET_ALL}")
     print(f"{Fore.CYAN}="*50)
 
+    # Communication Queue for Cross-Platform Messaging
+    outbox_queue = multiprocessing.Queue()
+
     # processes
-    p_whatsapp = multiprocessing.Process(target=start_whatsapp, name="WhatsAppBot")
-    p_telegram = multiprocessing.Process(target=start_telegram, name="TelegramBot")
+    p_whatsapp = multiprocessing.Process(target=start_whatsapp, args=(outbox_queue,), name="WhatsAppBot")
+    p_telegram = multiprocessing.Process(target=start_telegram, args=(outbox_queue,), name="TelegramBot")
 
     processes = []
 
@@ -54,7 +57,7 @@ def main():
         p_telegram.start()
         processes.append(p_telegram)
 
-        print(f"\n{Fore.WHITE}✅ Both bots are running in background processes.")
+        print(f"\n{Fore.WHITE}✅ Both bots are connected via IPC Queue.")
         print(f"Press {Fore.YELLOW}Ctrl+C{Fore.WHITE} to stop the system.\n")
 
         while True:

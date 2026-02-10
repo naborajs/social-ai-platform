@@ -70,6 +70,27 @@ def init_db():
                     FOREIGN KEY(group_id) REFERENCES groups(id),
                     FOREIGN KEY(user_id) REFERENCES users(id)
                 )''')
+
+    # Blocked Users table
+    c.execute('''CREATE TABLE IF NOT EXISTS blocked_users (
+                    user_id INTEGER,
+                    blocked_user_id INTEGER,
+                    PRIMARY KEY(user_id, blocked_user_id),
+                    FOREIGN KEY(user_id) REFERENCES users(id),
+                    FOREIGN KEY(blocked_user_id) REFERENCES users(id)
+                )''')
+
+    # Private Messages table
+    c.execute('''CREATE TABLE IF NOT EXISTS private_messages (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    from_id INTEGER,
+                    to_id INTEGER,
+                    content TEXT,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    is_read INTEGER DEFAULT 0,
+                    FOREIGN KEY(from_id) REFERENCES users(id),
+                    FOREIGN KEY(to_id) REFERENCES users(id)
+                )''')
     
     # Migrations
     columns = [
@@ -81,7 +102,9 @@ def init_db():
         ("avatar_url", "TEXT"),
         ("bio", "TEXT"),
         ("system_prompt", "TEXT"),
-        ("uuid", "TEXT")
+        ("uuid", "TEXT"),
+        ("preferred_platform", "TEXT DEFAULT 'whatsapp'"),
+        ("active_chat_id", "INTEGER") # For context-based chatting
     ]
     
     for col_name, col_type in columns:
@@ -258,6 +281,16 @@ def get_user_api_key(user_id):
     conn.close()
     return result[0] if result else None
 
+def get_user_by_id(user_id):
+    """Retrieve basic user info by internal ID."""
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT id, username, whatsapp_id, telegram_id, preferred_platform FROM users WHERE id = ?", (user_id,))
+    user = c.fetchone()
+    conn.close()
+    return dict(user) if user else None
+
 
 def log_conversation(user_id, message, response):
      conn = sqlite3.connect(DB_NAME)
@@ -395,3 +428,96 @@ def join_group(group_id, user_id):
 
 # Initialize on import
 init_db()
+
+def block_user(user_id, target_username):
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("SELECT id FROM users WHERE username = ?", (target_username,))
+    target = c.fetchone()
+    if not target:
+        conn.close()
+        return False, "User not found."
+    try:
+        c.execute("INSERT INTO blocked_users (user_id, blocked_user_id) VALUES (?, ?)", (user_id, target[0]))
+        conn.commit()
+        return True, f"User {target_username} blocked."
+    except sqlite3.IntegrityError:
+        return False, "User already blocked."
+    finally:
+        conn.close()
+
+def unblock_user(user_id, target_username):
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("SELECT id FROM users WHERE username = ?", (target_username,))
+    target = c.fetchone()
+    if target:
+        c.execute("DELETE FROM blocked_users WHERE user_id = ? AND blocked_user_id = ?", (user_id, target[0]))
+        conn.commit()
+        conn.close()
+        return True, f"User {target_username} unblocked."
+    conn.close()
+    return False, "User not found."
+
+def is_blocked(user_id, target_id):
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("SELECT 1 FROM blocked_users WHERE user_id = ? AND blocked_user_id = ?", (target_id, user_id))
+    blocked = c.fetchone() is not None
+    conn.close()
+    return blocked
+
+def set_preferred_platform(user_id, platform):
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("UPDATE users SET preferred_platform = ? WHERE id = ?", (platform, user_id))
+    conn.commit()
+    conn.close()
+
+def get_user_contact_info(username):
+    """Retrieve platform IDs and preferred platform for messaging."""
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("SELECT id, whatsapp_id, telegram_id, preferred_platform FROM users WHERE username = ?", (username,))
+    res = c.fetchone()
+    conn.close()
+    if res:
+        return {"id": res[0], "whatsapp_id": res[1], "telegram_id": res[2], "preferred_platform": res[3]}
+    return None
+
+def log_private_message(from_id, to_id, content):
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("INSERT INTO private_messages (from_id, to_id, content) VALUES (?, ?, ?)", (from_id, to_id, content))
+    conn.commit()
+    conn.close()
+
+def set_active_chat(user_id, target_user_id):
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("UPDATE users SET active_chat_id = ? WHERE id = ?", (target_user_id, user_id))
+    conn.commit()
+    conn.close()
+
+def get_active_chat(user_id):
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("SELECT active_chat_id FROM users WHERE id = ?", (user_id,))
+    res = c.fetchone()
+    conn.close()
+    return res[0] if res else None
+
+def remove_friend(user_id, friend_username):
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("SELECT id FROM users WHERE username = ?", (friend_username,))
+    friend = c.fetchone()
+    if friend:
+        f_id = friend[0]
+        c.execute("DELETE FROM friends WHERE (user1_id = ? AND user2_id = ?) OR (user1_id = ? AND user2_id = ?)", 
+                  (user_id, f_id, f_id, user_id))
+        conn.commit()
+        conn.close()
+        return True, f"Friendship with {friend_username} removed."
+    conn.close()
+    return False, "Friend not found."
