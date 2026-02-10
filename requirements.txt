@@ -1,0 +1,11 @@
+google-generativeai
+neonize
+python-dotenv
+colorama
+python-telegram-bot
+passlib
+bcrypt
+Pillow
+moviepy
+cryptography
+protobuf
