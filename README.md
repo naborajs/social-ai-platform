@@ -10,7 +10,7 @@
 
 An intelligent, production-ready AI social platform that brings personalized chatbot experiences to WhatsApp and Telegram. Each user gets a unique identity with customizable AI personalities, making conversations feel truly human.
 ## 🔄 Recent Updates
-- **Version**: v3.5 (Resilient & Persistent)
+- **Version**: v3.6 (QR & Secure Sharing)
 - **Status**: Stable / Production Ready
 - **v3.4**: WhatsApp Pairing Code (OTP) Activation 🔑
 - **v3.4**: OTP-based Login System (`/otp_login`, `/verify`) 🔐
@@ -519,9 +519,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - [ ] Web dashboard for user management
 - [x] Group chat support
+- [x] **Secure QR Generation**: Create standard and encrypted QR codes for data sharing.
+- [x] **Multimedia Messaging**: Bot support for sending images and documents across platforms.
 - [x] **High Availability**: Automatic process restarter for WhatsApp and Telegram.
-- [x] **Data Integrity**: All databases and sessions stored in a secure `data/` directory.
-- [x] **Robust Persistence**: SQLite WAL mode enabled for safe data handling during restarts.
 - [x] **One-Time Pairing**: Logged-in WhatsApp sessions persist even after server reboots.
 - [ ] Voice message processing
 - [ ] Multi-language support

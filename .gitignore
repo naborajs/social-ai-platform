@@ -28,6 +28,7 @@ wheels/
 *.db
 *.sqlite3
 sessions/
+data/qr_codes/
 
 # IDEs
 .vscode/

@@ -47,9 +47,15 @@ def run_telegram_bot(queues):
                 item = tg_queue.get()
                 target = item.get("target")
                 text = item.get("text")
+                image_path = item.get("image_path")
+                
                 if target and text:
                     print(f"📥 IPC -> Telegram: Sending to {target}")
-                    loop.run_until_complete(bot.send_message(chat_id=target, text=text, parse_mode='Markdown'))
+                    if image_path and os.path.exists(image_path):
+                        with open(image_path, 'rb') as photo:
+                            loop.run_until_complete(bot.send_photo(chat_id=target, photo=photo, caption=text, parse_mode='Markdown'))
+                    else:
+                        loop.run_until_complete(bot.send_message(chat_id=target, text=text, parse_mode='Markdown'))
             except Exception as e:
                 print(f"❌ Telegram Queue Listener Error: {e}")
                 time.sleep(2)

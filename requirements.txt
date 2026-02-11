@@ -9,3 +9,4 @@ Pillow
 moviepy
 cryptography
 protobuf
+qrcode[pil]

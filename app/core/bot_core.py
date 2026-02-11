@@ -4,13 +4,14 @@ from app.core.user_flow import ConversationManager
 from app.features.love_calculator import LoveCalculator
 from app.features.llm_handler import GeminiHandler
 from app.core.config import GOOGLE_API_KEY
+from app.core.qr_handler import qr_handler
 
 class UnifiedBot:
     def __init__(self, queues=None):
         self.chatbot = ChatBot()
         # Override chatbot name/version if needed
         self.chatbot.name = "TrueFriend"
-        self.chatbot.version = "3.4"
+        self.chatbot.version = "3.6"
         self.conv_manager = ConversationManager()
         self.queues = queues # Dict of {platform: queue}
         
@@ -66,6 +67,38 @@ class UnifiedBot:
                 })
                 return f"📧 OTP sent to the WhatsApp account for {target_username}. Reply with `/verify <otp>`."
             return "❌ Messaging system unavailable. Try again later."
+
+        elif command == "/qr":
+            if len(message_parts) < 2:
+                return "❌ Usage: `/qr <text>`"
+            text = " ".join(message_parts[1:])
+            qr_path = qr_handler.generate_qr(text)
+            if qr_path:
+                if self.queues and platform in self.queues:
+                    self.queues[platform].put({
+                        "platform": platform,
+                        "target": platform_id,
+                        "text": f"✅ Standard QR generated for: *{text[:30]}...*",
+                        "image_path": qr_path
+                    })
+                    return None # Handled via queue
+            return "❌ Failed to generate QR."
+
+        elif command == "/secure_qr":
+            if len(message_parts) < 2:
+                return "❌ Usage: `/secure_qr <text>`"
+            text = " ".join(message_parts[1:])
+            qr_path = qr_handler.generate_qr(text, secure=True)
+            if qr_path:
+                if self.queues and platform in self.queues:
+                    self.queues[platform].put({
+                        "platform": platform,
+                        "target": platform_id,
+                        "text": f"🔒 **Secure QR Generated**\nThis QR contains fully encrypted data. Scan it to unlock the secret!",
+                        "image_path": qr_path
+                    })
+                    return None
+            return "❌ Failed to generate Secure QR."
 
         elif command == "/verify":
             from app.core.database import get_state, clear_state, update_platform_id
