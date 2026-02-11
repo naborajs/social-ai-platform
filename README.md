@@ -290,6 +290,8 @@ Bot: ✅ Registration successful!
 - `/otp_login <username>` - Request a login OTP on WhatsApp 🔐
 - `/verify <otp>` - Verify OTP and log in
 - `/recover <backup_key> <new_password>` - Recover account
+- `/help` - Show detailed menu with all commands 🌟
+- `/about` - Developer info and project mission 👨‍💻
 
 #### Account Management
 - `/set_key <your_api_key>` - Set your personal Gemini API key
@@ -301,6 +303,8 @@ Bot: ✅ Registration successful!
 - `love <name1> and <name2>` - Love compatibility calculator
 - Send a photo → Get a sticker
 - Send a video → Get a GIF
+- `/qr <text>` - Generate a standard QR code 🖼️
+- `/secure_qr <text>` - Generate an encrypted QR code 🔒
 
 ---
 

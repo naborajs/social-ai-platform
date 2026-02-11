@@ -57,7 +57,7 @@ class ConversationManager:
             # Save username, move to next step
             data['username'] = text
             set_state(platform_id, platform, self.STATE_REG_EMAIL, data)
-            return "📧 Great! Now, what is your **Email Address**?", None, False
+            return "📧 Great! Now, what is your **Email Address**?\n\n_This helps in account recovery if needed._", None, False
 
         elif state == self.STATE_REG_EMAIL:
             # Validate Email
@@ -66,7 +66,7 @@ class ConversationManager:
                 
             data['email'] = text
             set_state(platform_id, platform, self.STATE_REG_PASSWORD, data)
-            return "🔐 Secure your account. Create a **Password**:", None, False
+            return "🔐 **Secure your account**. Create a **Secret Password**:\n\n_Make it strong! Remember it well._", None, False
 
         elif state == self.STATE_REG_PASSWORD:
             if len(text) < 6:
@@ -74,7 +74,7 @@ class ConversationManager:
                 
             data['password'] = text
             set_state(platform_id, platform, self.STATE_REG_GENDER, data)
-            return "👤 What is your **Gender**? (he/she)\nThis helps me tailor my style for you.", None, False
+            return "👤 What is your **Gender**? (he/she)\n\n_This helps me tailor my style and personality for you._", None, False
 
         elif state == self.STATE_REG_GENDER:
             gender = "she" if "she" in text.lower() else "he"
@@ -85,8 +85,8 @@ class ConversationManager:
             set_state(platform_id, platform, self.STATE_REG_AVATAR, data)
             
             # Show Avatar Options
-            msg = "🎨 Choose your **Identity (Avatar)**:\n\n"
-            msg += "1️⃣ Adventurer Felix\n2️⃣ Adventurer Aneka\n3️⃣ Midnight Warrior\n4️⃣ Retro Bot\n\nReply with the number (1-4) or type a custom URL."
+            msg = "🎨 **Let's pick an Identity!** Choose your **Avatar**:\n\n"
+            msg += "1️⃣ Adventurer Felix\n2️⃣ Adventurer Aneka\n3️⃣ Midnight Warrior\n4️⃣ Retro Bot\n\n_Reply with the number (1-4) or type a custom image URL._"
             return msg, self.AVATARS, False # Return avatars dict for UI handling
 
         elif state == self.STATE_REG_AVATAR:
@@ -143,9 +143,9 @@ class ConversationManager:
             
             onboarding_msg = msg + "\n\n🎉 **Setup Complete!**\n\n"
             onboarding_msg += "💡 **Quick Tips**:\n"
-            onboarding_msg += "• Type `/mood` to change my tone of voice.\n"
-            onboarding_msg += "• Type `/report <msg>` if something isn't working.\n"
-            onboarding_msg += "• You can always change genders with `/gender <me> <ai>`.\n\n"
+            onboarding_msg += "• Type `/help` for a full list of commands 🌟\n"
+            onboarding_msg += "• Type `/mood` to change my tone of voice ✨\n"
+            onboarding_msg += "• You can always change genders with `/gender <me> <ai>` 👤\n\n"
             onboarding_msg += "How are you feeling today?"
             
             return onboarding_msg, None, True
@@ -155,4 +155,4 @@ class ConversationManager:
     def start_registration(self, platform_id, platform):
         """Start the registration flow."""
         set_state(platform_id, platform, self.STATE_REG_USERNAME, {})
-        return "👋 Welcome! Let's get you set up.\n\nFirst, choose a unique **Username**:"
+        return "👋 **Welcome to TrueFriend!** Let's get you set up.\n\nFirst, choose a unique **Username**:"

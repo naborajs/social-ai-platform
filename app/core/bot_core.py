@@ -29,7 +29,8 @@ class UnifiedBot:
         
         if command == "/register" or command == "/start":
             if user_data:
-                return "✅ You are already registered! Just start chatting."
+                username = user_data[1]
+                return f"🌟 *Welcome back, {username}!* 🌟\n\nI'm your intelligent AI companion. Type anything to chat, or use `/help` to see what I can do for you. 🚀"
             return self.conv_manager.start_registration(platform_id, platform)
             
         elif command == "/login":
@@ -99,6 +100,51 @@ class UnifiedBot:
                     })
                     return None
             return "❌ Failed to generate Secure QR."
+
+        elif command == "/help":
+            help_text = (
+                "🌟 *TrueFriend AI Platform Help* 🌟\n"
+                "Connecting WhatsApp & Telegram with Intelligent Personas.\n\n"
+                "🔑 *Account Commands*\n"
+                "- `/register` - Start your journey\n"
+                "- `/login <user> <pass>` - Access your profile\n"
+                "- `/otp_login <user>` - Secure OTP login\n"
+                "- `/verify <otp>` - Confirm OTP\n"
+                "- `/set_api_key <key>` - Add Gemini API key\n"
+                "- `/change_password <new>` - Secure your account\n"
+                "- `/recover_account <key> <new>` - Account recovery\n\n"
+                "🤝 *Social & Chat*\n"
+                "- `/add_friend <user>` - Send request\n"
+                "- `/accept <user>` - Confirm friend\n"
+                "- `/friends` - View your squad\n"
+                "- `/msg <user> <text>` - Direct message\n"
+                "- `/clear_history` - Fresh start\n\n"
+                "🛡️ *Privacy & QR*\n"
+                "- `/qr <text>` - Standard QR\n"
+                "- `/secure_qr <text>` - Encrypted QR\n"
+                "- `/set_notify <wa|tg>` - Cross-sync context\n\n"
+                "ℹ️ *Info*\n"
+                "- `/help` - Show this menu\n"
+                "- `/about` - Who built this?\n\n"
+                "✨ *Simply type your message to chat with your AI friend!*"
+            )
+            return help_text
+
+        elif command == "/about":
+            about_text = (
+                "👨‍💻 *About the Developer*\n\n"
+                "This platform was built with 💖 by **NABORAJ SARKAR** (Nishant).\n\n"
+                "🚀 *Mission*: Bringing seamless, secure, and intelligent social experiences across all platforms.\n\n"
+                "📱 *Connect with Me*:\n"
+                "- 📺 *YouTube*: NS GAMMiNG\n"
+                "- ✉️ *Email*: nishant.ns.business@gmail.com\n"
+                "- 📸 *Instagram*: @naborajs\n"
+                "- 🐦 *X/Twitter*: @NSGAMMING699\n"
+                "- 💬 *Telegram*: @Nishantsarkar10k\n"
+                "- 💻 *GitHub*: naborajs\n\n"
+                "🛡️ *System*: Unified v3.6 - Encrypted, Resilient, & Intelligent."
+            )
+            return about_text
 
         elif command == "/verify":
             from app.core.database import get_state, clear_state, update_platform_id
