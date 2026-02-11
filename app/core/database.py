@@ -203,6 +203,16 @@ def get_user_by_platform(platform, platform_id):
     conn.close()
     return user # Returns (id, username, gemini_api_key, system_prompt)
 
+def get_user_by_username(username):
+    """Retrieve user info by username."""
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT id, username, whatsapp_id, telegram_id, preferred_platform FROM users WHERE username = ?", (username,))
+    user = c.fetchone()
+    conn.close()
+    return dict(user) if user else None
+
 def verify_user(username, password):
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()

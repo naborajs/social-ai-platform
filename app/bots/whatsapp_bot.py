@@ -6,6 +6,7 @@ from neonize.client import NewClient
 from neonize.events import ConnectedEv, MessageEv, PairStatusEv
 from neonize.types import MessageServerID
 from app.core.bot_core import UnifiedBot
+from app.core.config import BOT_WHATSAPP_NUMBER
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -121,6 +122,20 @@ def run_whatsapp_bot(outbox_queue):
             print(f"❌ Error processing message: {e}")
 
     print("📱 Please scan the QR code if prompted.")
+    
+    if BOT_WHATSAPP_NUMBER and not os.path.exists("whatsapp_session.sqlite3"):
+        print(f"🔑 Generating Pairing Code for: {BOT_WHATSAPP_NUMBER}")
+        # We need to connect first to trigger the pairing process or use pair_code
+        # In neonize, it's often handled via an event or direct call before connect
+        # But wait, neonize-python's current version often handles it like this:
+        try:
+             # This will show the pairing code in the terminal
+             code = client.pair_code(BOT_WHATSAPP_NUMBER, show=True)
+             print(f"\n🚀 PAIRING CODE: {code}\n")
+             print("Please enter this code on your phone in WhatsApp 'Link a Device'.")
+        except Exception as e:
+             print(f"⚠️ Could not generate pairing code: {e}")
+
     client.connect()
 
 if __name__ == "__main__":

@@ -6,7 +6,7 @@ load_dotenv()
 api_key = os.getenv("GOOGLE_API_KEY")
 
 if not api_key:
-    print("No API key found")
+    print("No API key found please add a api key to the .env file")
 else:
     genai.configure(api_key=api_key)
     try:

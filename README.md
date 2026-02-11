@@ -10,6 +10,8 @@
 
 An intelligent, production-ready AI social platform that brings personalized chatbot experiences to WhatsApp and Telegram. Each user gets a unique identity with customizable AI personalities, making conversations feel truly human.
 ## 🔄 Recent Updates
+- **v3.4**: WhatsApp Pairing Code (OTP) Activation 🔑
+- **v3.4**: OTP-based Login System (`/otp_login`, `/verify`) 🔐
 - **v3.3**: Hardened Security & Prompt Injection Detection 🛡️
 - **v3.3**: Graceful Error Handling & Privacy Guards
 - **v3.2**: AI Emotions & Personalized Memory System 🧠
@@ -105,6 +107,7 @@ Create a `.env` file in the root directory:
 GOOGLE_API_KEY=your_gemini_api_key_here
 TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
 DB_NAME=whatsapp_bot.db
+BOT_WHATSAPP_NUMBER=+1234567890
 ```
 
 **Note:** Users can also set their own Gemini API keys after registration using `/set_key`.
@@ -121,9 +124,12 @@ python main.py
 This starts both WhatsApp and Telegram bots simultaneously.
 
 ### WhatsApp Setup
-1. Run `python main.py`
-2. Scan the QR code displayed in the terminal with WhatsApp
-3. The bot is now connected!
+1.  Set `BOT_WHATSAPP_NUMBER` in your `.env` file.
+2.  Run `python main.py`.
+3.  **Activation**: The bot will generate a **Pairing Code** shown in your terminal.
+4.  On your phone (WhatsApp) -> Settings -> Linked Devices -> Link a Device -> **Link with phone number instead**.
+5.  Enter the code shown in the terminal.
+6.  The bot is now connected! (Or scan the QR code if no number is provided).
 
 ### Telegram Setup
 1. Get a bot token from [@BotFather](https://t.me/botfather)
@@ -268,6 +274,8 @@ Bot: ✅ Registration successful!
 #### Authentication
 - `/register` - Start interactive registration
 - `/login <username> <password>` - Login to existing account
+- `/otp_login <username>` - Request a login OTP on WhatsApp 🔐
+- `/verify <otp>` - Verify OTP and log in
 - `/recover <backup_key> <new_password>` - Recover account
 
 #### Account Management
@@ -292,6 +300,7 @@ Bot: ✅ Registration successful!
 | `GOOGLE_API_KEY` | Default Gemini API key | Optional* |
 | `TELEGRAM_BOT_TOKEN` | Telegram bot token from BotFather | Yes (for Telegram) |
 | `DB_NAME` | SQLite database filename | No (default: `whatsapp_bot.db`) |
+| `BOT_WHATSAPP_NUMBER` | WhatsApp number for terminal linking | No (triggers QR if missing) |
 
 *Users can set their own API keys via `/set_key`
 

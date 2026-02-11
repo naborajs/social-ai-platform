@@ -43,6 +43,46 @@ class UnifiedBot:
             else:
                 return "❌ Invalid username or password."
 
+        elif command == "/otp_login":
+            if len(message_parts) < 2:
+                return "❌ Usage: `/otp_login <username>`"
+            target_username = message_parts[1]
+            from app.core.database import get_user_by_username, set_state
+            u_info = get_user_by_username(target_username)
+            if not u_info or not u_info.get('whatsapp_id'):
+                return f"❌ User '{target_username}' not found or has no linked WhatsApp."
+            
+            import random
+            otp = f"{random.randint(100000, 999999)}"
+            print(f"🔐 OTP for {target_username}: {otp}") # Show in terminal
+            
+            set_state(platform_id, platform, "OTP_VERIFY", {"username": target_username, "otp": otp})
+            
+            if self.outbox_queue:
+                self.outbox_queue.put({
+                    "platform": "whatsapp",
+                    "target": u_info['whatsapp_id'],
+                    "text": f"🔐 **Login OTP**: *{otp}*\nUse `/verify {otp}` to log in."
+                })
+                return f"📧 OTP sent to the WhatsApp account for {target_username}. Reply with `/verify <otp>`."
+            return "❌ Messaging system unavailable. Try again later."
+
+        elif command == "/verify":
+            from app.core.database import get_state, clear_state, update_platform_id
+            state, data = get_state(platform_id)
+            if state == "OTP_VERIFY":
+                entered_otp = message_parts[1] if len(message_parts) > 1 else ""
+                expected_otp = data.get("otp")
+                if entered_otp == expected_otp:
+                    u_target = data.get("username")
+                    from app.core.database import get_user_by_username
+                    user = get_user_by_username(u_target)
+                    update_platform_id(user['id'], platform, platform_id)
+                    clear_state(platform_id)
+                    return f"✅ OTP Verified! Welcome back, {u_target}. 👋"
+                return "❌ Invalid OTP. Try again."
+            return "❌ No OTP verification in progress. Use `/otp_login <username>` first."
+
         if not user_data:
             return "🔒 **Authentication Required**\n\nPlease `/register` or `/login` to start."
         

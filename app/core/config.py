@@ -6,6 +6,7 @@ load_dotenv()
 # API Keys
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+BOT_WHATSAPP_NUMBER = os.getenv("BOT_WHATSAPP_NUMBER")
 
 # Database Configuration
 # Use absolute path for DB to avoid issues when running from different directories
