@@ -36,15 +36,19 @@ def start_telegram(queue):
 
 def main():
     print(f"{Fore.CYAN}="*50)
-    print(f"{Fore.YELLOW}🚀 Starting Unified Bot System v3.1...{Style.RESET_ALL}")
+    print(f"{Fore.YELLOW}🚀 Starting Unified Bot System v3.4...{Style.RESET_ALL}")
     print(f"{Fore.CYAN}="*50)
 
-    # Communication Queue for Cross-Platform Messaging
-    outbox_queue = multiprocessing.Queue()
+    # Communication Queues for Cross-Platform Messaging
+    # We use separate queues to avoid "put it back" cycling logic
+    queues = {
+        "whatsapp": multiprocessing.Queue(),
+        "telegram": multiprocessing.Queue()
+    }
 
     # processes
-    p_whatsapp = multiprocessing.Process(target=start_whatsapp, args=(outbox_queue,), name="WhatsAppBot")
-    p_telegram = multiprocessing.Process(target=start_telegram, args=(outbox_queue,), name="TelegramBot")
+    p_whatsapp = multiprocessing.Process(target=start_whatsapp, args=(queues,), name="WhatsAppBot")
+    p_telegram = multiprocessing.Process(target=start_telegram, args=(queues,), name="TelegramBot")
 
     processes = []
 
@@ -57,7 +61,7 @@ def main():
         p_telegram.start()
         processes.append(p_telegram)
 
-        print(f"\n{Fore.WHITE}✅ Both bots are connected via IPC Queue.")
+        print(f"\n{Fore.WHITE}✅ Both bots are connected via IPC Queues.")
         print(f"Press {Fore.YELLOW}Ctrl+C{Fore.WHITE} to stop the system.\n")
 
         while True:

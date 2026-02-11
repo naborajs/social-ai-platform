@@ -17,11 +17,11 @@ logging.basicConfig(
 import threading
 import asyncio
 
-def run_telegram_bot(outbox_queue):
+def run_telegram_bot(queues):
     print("🚀 Starting Telegram Bot...")
     
-    # Initialize Unified Bot with Queue for IPC
-    bot_core = UnifiedBot(outbox_queue)
+    # Initialize Unified Bot with Queues for IPC
+    bot_core = UnifiedBot(queues)
     
     # Initialize Application
     telegram_token = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -33,29 +33,23 @@ def run_telegram_bot(outbox_queue):
 
     def queue_listener():
         """Thread to listen for cross-platform messages destined for Telegram."""
-        # We need a reference to the bot object which is in the application
-        # but the application is not fully started yet. 
-        # Application.run_polling is blocking.
-        # We can use the bot object directly from the application after it's built.
+        if not queues or "telegram" not in queues:
+            return
+            
+        tg_queue = queues["telegram"]
         bot = application.bot
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
         while True:
             try:
-                if not outbox_queue.empty():
-                    item = outbox_queue.get()
-                    if item.get("platform") == "telegram":
-                        target = item.get("target")
-                        text = item.get("text")
-                        if target and text:
-                            print(f"📥 IPC -> Telegram: Sending to {target}")
-                            loop.run_until_complete(bot.send_message(chat_id=target, text=text, parse_mode='Markdown'))
-                    else:
-                        # Put it back if not for us
-                        outbox_queue.put(item)
-                        time.sleep(0.5)
-                time.sleep(1)
+                # Get message from our specific queue
+                item = tg_queue.get()
+                target = item.get("target")
+                text = item.get("text")
+                if target and text:
+                    print(f"📥 IPC -> Telegram: Sending to {target}")
+                    loop.run_until_complete(bot.send_message(chat_id=target, text=text, parse_mode='Markdown'))
             except Exception as e:
                 print(f"❌ Telegram Queue Listener Error: {e}")
                 time.sleep(2)

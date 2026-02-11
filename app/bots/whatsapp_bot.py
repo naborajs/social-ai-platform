@@ -13,33 +13,30 @@ load_dotenv()
 
 import threading
 
-def run_whatsapp_bot(outbox_queue):
+def run_whatsapp_bot(queues):
     print("🚀 Starting WhatsApp Bot (Unified)...")
     
-    # Initialize Unified Bot with Queue for IPC
-    bot_core = UnifiedBot(outbox_queue)
+    # Initialize Unified Bot with Queues for IPC
+    bot_core = UnifiedBot(queues)
 
     # Initialize Neonize Client
     client = NewClient("whatsapp_session.sqlite3")
 
     def queue_listener():
         """Thread to listen for cross-platform messages destined for WhatsApp."""
+        if not queues or "whatsapp" not in queues:
+            return
+        
+        wa_queue = queues["whatsapp"]
         while True:
             try:
-                # We check the queue for messages
-                if not outbox_queue.empty():
-                    item = outbox_queue.get()
-                    if item.get("platform") == "whatsapp":
-                        target = item.get("target")
-                        text = item.get("text")
-                        if target and text:
-                            print(f"📥 IPC -> WhatsApp: Sending to {target}")
-                            client.send_message(target, text)
-                    else:
-                        # Put it back if not for us, wait a bit
-                        outbox_queue.put(item)
-                        time.sleep(0.5)
-                time.sleep(1)
+                # Get message from our specific queue
+                item = wa_queue.get()
+                target = item.get("target")
+                text = item.get("text")
+                if target and text:
+                    print(f"📥 IPC -> WhatsApp: Sending to {target}")
+                    client.send_message(target, text)
             except Exception as e:
                 print(f"❌ WhatsApp Queue Listener Error: {e}")
                 time.sleep(2)

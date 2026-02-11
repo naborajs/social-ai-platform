@@ -6,13 +6,13 @@ from app.features.llm_handler import GeminiHandler
 from app.core.config import GOOGLE_API_KEY
 
 class UnifiedBot:
-    def __init__(self, outbox_queue=None):
+    def __init__(self, queues=None):
         self.chatbot = ChatBot()
         # Override chatbot name/version if needed
         self.chatbot.name = "TrueFriend"
-        self.chatbot.version = "3.1"
+        self.chatbot.version = "3.4"
         self.conv_manager = ConversationManager()
-        self.outbox_queue = outbox_queue
+        self.queues = queues # Dict of {platform: queue}
         
     def handle_message(self, message, platform, platform_id):
         # 1. Check Active Conversation State First (Registration/Onboarding)
@@ -58,8 +58,8 @@ class UnifiedBot:
             
             set_state(platform_id, platform, "OTP_VERIFY", {"username": target_username, "otp": otp})
             
-            if self.outbox_queue:
-                self.outbox_queue.put({
+            if self.queues and "whatsapp" in self.queues:
+                self.queues["whatsapp"].put({
                     "platform": "whatsapp",
                     "target": u_info['whatsapp_id'],
                     "text": f"🔐 **Login OTP**: *{otp}*\nUse `/verify {otp}` to log in."
@@ -148,17 +148,22 @@ class UnifiedBot:
             return msg
 
         if command == "/set_notify":
-             if len(message_parts) < 2 or message_parts[1].lower() not in ["wa", "tg", "whatsapp", "telegram"]:
+             if len(message_parts) < 2:
                  return "❌ Usage: `/set_notify <wa|tg>`"
-             plat = "whatsapp" if message_parts[1].lower() in ["wa", "whatsapp"] else "telegram"
+             notify_plat = message_parts[1].lower()
+             if notify_plat not in ["wa", "tg", "whatsapp", "telegram"]:
+                 return "❌ Invalid platform. Use `wa` or `tg`."
+             plat = "whatsapp" if notify_plat in ["wa", "whatsapp"] else "telegram"
              from app.core.database import set_preferred_platform
              set_preferred_platform(user_id, plat)
              return f"✅ Notifications will now be sent to your **{plat.title()}** account."
 
         # Re-use existing friend/group commands
         if command == "/add_friend":
+            if len(message_parts) < 2:
+                return "❌ Usage: `/add_friend <username>`"
             from app.core.database import send_friend_request
-            success, msg = send_friend_request(user_id, message_parts[1] if len(message_parts)>1 else "")
+            success, msg = send_friend_request(user_id, message_parts[1])
             return msg
 
         if command == "/friends":
@@ -167,8 +172,10 @@ class UnifiedBot:
             return "👥 **Friends**:\n" + "\n".join([f"• {f}" for f in friends]) if friends else "👥 No friends yet."
 
         if command == "/accept":
+            if len(message_parts) < 2:
+                return "❌ Usage: `/accept <username>`"
             from app.core.database import accept_friend_request
-            success, msg = accept_friend_request(user_id, message_parts[1] if len(message_parts)>1 else "")
+            success, msg = accept_friend_request(user_id, message_parts[1])
             return msg
 
         if command == "/mood":
@@ -281,6 +288,9 @@ class UnifiedBot:
             return "❌ You can only message your friends."
 
         target_info = get_user_contact_info(to_username)
+        if not target_info:
+            return f"❌ {to_username} not found."
+        
         pref_plat = target_info['preferred_platform']
         plat_id = target_info['whatsapp_id'] if pref_plat == 'whatsapp' else target_info['telegram_id']
         
@@ -293,13 +303,13 @@ class UnifiedBot:
             return f"❌ {to_username} has not linked their {pref_plat} account."
 
         # Dispatch via Queue
-        if self.outbox_queue:
+        if self.queues and pref_plat in self.queues:
             payload = {
                 "platform": pref_plat,
                 "target": plat_id,
                 "text": f"🔒 **Private Message from {from_username}**:\n{content}"
             }
-            self.outbox_queue.put(payload)
+            self.queues[pref_plat].put(payload)
             log_private_message(from_id, to_id, content)
             return f"📤 Message sent to {to_username}!"
         

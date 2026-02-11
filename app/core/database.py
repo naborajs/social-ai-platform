@@ -2,6 +2,7 @@ import sqlite3
 import json
 import bcrypt
 from app.core.config import DB_NAME
+from app.core.security import security_manager
 
 def init_db():
     conn = sqlite3.connect(DB_NAME)
@@ -201,6 +202,11 @@ def get_user_by_platform(platform, platform_id):
         c.execute("SELECT id, username, gemini_api_key, system_prompt FROM users WHERE telegram_id = ?", (platform_id,))
     user = c.fetchone()
     conn.close()
+    if user:
+        # Decrypt API Key
+        u_list = list(user)
+        u_list[2] = security_manager.decrypt(u_list[2])
+        return tuple(u_list)
     return user # Returns (id, username, gemini_api_key, system_prompt)
 
 def get_user_by_username(username):
@@ -248,7 +254,7 @@ def change_password(user_id, new_password):
     """Securely update the user's password."""
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
-    hashed = bcrypt.hash(new_password)
+    hashed = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
     c.execute("UPDATE users SET password_hash = ? WHERE id = ?", (hashed, user_id))
     conn.commit()
     conn.close()
@@ -274,7 +280,7 @@ def recover_account(recovery_key, new_password):
     user = c.fetchone()
     if user:
         user_id = user[0]
-        hashed = bcrypt.hash(new_password)
+        hashed = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
         c.execute("UPDATE users SET password_hash = ? WHERE id = ?", (hashed, user_id))
         conn.commit()
         conn.close()
@@ -283,11 +289,12 @@ def recover_account(recovery_key, new_password):
     return False, "❌ Invalid recovery key."
 
 def set_api_key(user_id, api_key):
-    """Set the user's personal Gemini API key."""
+    """Set the user's personal Gemini API key (encrypted)."""
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
     try:
-        c.execute("UPDATE users SET gemini_api_key = ? WHERE id = ?", (api_key, user_id))
+        encrypted_key = security_manager.encrypt(api_key)
+        c.execute("UPDATE users SET gemini_api_key = ? WHERE id = ?", (encrypted_key, user_id))
         conn.commit()
         return True, "✅ API Key set successfully!"
     except Exception as e:
@@ -296,13 +303,15 @@ def set_api_key(user_id, api_key):
         conn.close()
 
 def get_user_api_key(user_id):
-    """Retrieve the user's personal Gemini API key."""
+    """Retrieve the user's personal Gemini API key (decrypted)."""
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
     c.execute("SELECT gemini_api_key FROM users WHERE id = ?", (user_id,))
     result = c.fetchone()
     conn.close()
-    return result[0] if result else None
+    if result and result[0]:
+        return security_manager.decrypt(result[0])
+    return None
 
 def get_user_by_id(user_id):
     """Retrieve basic user info by internal ID."""
