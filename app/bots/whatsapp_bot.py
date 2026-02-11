@@ -6,7 +6,8 @@ from neonize.client import NewClient
 from neonize.events import ConnectedEv, MessageEv, PairStatusEv
 from neonize.types import MessageServerID
 from app.core.bot_core import UnifiedBot
-from app.core.config import BOT_WHATSAPP_NUMBER
+from app.core.config import BOT_WHATSAPP_NUMBER, WHATSAPP_SESSION
+from app.core.database import get_inactive_users
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -20,7 +21,7 @@ def run_whatsapp_bot(queues):
     bot_core = UnifiedBot(queues)
 
     # Initialize Neonize Client
-    client = NewClient("whatsapp_session.sqlite3")
+    client = NewClient(WHATSAPP_SESSION)
 
     def queue_listener():
         """Thread to listen for cross-platform messages destined for WhatsApp."""
@@ -120,7 +121,7 @@ def run_whatsapp_bot(queues):
 
     print("📱 Please scan the QR code if prompted.")
     
-    if BOT_WHATSAPP_NUMBER and not os.path.exists("whatsapp_session.sqlite3"):
+    if BOT_WHATSAPP_NUMBER and not os.path.exists(WHATSAPP_SESSION):
         print(f"🔑 Generating Pairing Code for: {BOT_WHATSAPP_NUMBER}")
         # We need to connect first to trigger the pairing process or use pair_code
         # In neonize, it's often handled via an event or direct call before connect

@@ -36,52 +36,46 @@ def start_telegram(queue):
 
 def main():
     print(f"{Fore.CYAN}="*50)
-    print(f"{Fore.YELLOW}🚀 Starting Unified Bot System v3.4...{Style.RESET_ALL}")
+    print(f"{Fore.YELLOW}🚀 Starting Unified Bot System v3.5 (Resilient)...{Style.RESET_ALL}")
     print(f"{Fore.CYAN}="*50)
 
     # Communication Queues for Cross-Platform Messaging
-    # We use separate queues to avoid "put it back" cycling logic
     queues = {
         "whatsapp": multiprocessing.Queue(),
         "telegram": multiprocessing.Queue()
     }
 
-    # processes
-    p_whatsapp = multiprocessing.Process(target=start_whatsapp, args=(queues,), name="WhatsAppBot")
-    p_telegram = multiprocessing.Process(target=start_telegram, args=(queues,), name="TelegramBot")
+    def create_process(name, target, args):
+        p = multiprocessing.Process(target=target, args=args, name=name)
+        p.start()
+        return p
 
-    processes = []
+    # Initial start
+    p_whatsapp = create_process("WhatsAppBot", start_whatsapp, (queues,))
+    p_telegram = create_process("TelegramBot", start_telegram, (queues,))
+
+    print(f"\n{Fore.WHITE}✅ Both bots are connected via IPC Queues.")
+    print(f"Press {Fore.YELLOW}Ctrl+C{Fore.WHITE} to stop the system.\n")
 
     try:
-        print(f"{Fore.GREEN}Starting WhatsApp Bot...{Style.RESET_ALL}")
-        p_whatsapp.start()
-        processes.append(p_whatsapp)
-        
-        print(f"{Fore.GREEN}Starting Telegram Bot...{Style.RESET_ALL}")
-        p_telegram.start()
-        processes.append(p_telegram)
-
-        print(f"\n{Fore.WHITE}✅ Both bots are connected via IPC Queues.")
-        print(f"Press {Fore.YELLOW}Ctrl+C{Fore.WHITE} to stop the system.\n")
-
         while True:
-            time.sleep(1)
-            # Check if processes are alive
+            time.sleep(5)
+            # Monitor and restart WhatsApp Bot
             if not p_whatsapp.is_alive():
-                print(f"{Fore.RED}⚠️ WhatsApp Bot process ended unexpectedly.{Style.RESET_ALL}")
-            if not p_telegram.is_alive():
-                print(f"{Fore.RED}⚠️ Telegram Bot process ended unexpectedly.{Style.RESET_ALL}")
+                print(f"{Fore.RED}⚠️ WhatsApp Bot stopped. Restarting...{Style.RESET_ALL}")
+                p_whatsapp = create_process("WhatsAppBot", start_whatsapp, (queues,))
             
-            if not p_whatsapp.is_alive() and not p_telegram.is_alive():
-                print(f"{Fore.RED}❌ All bots have stopped. Exiting.{Style.RESET_ALL}")
-                break
-
+            # Monitor and restart Telegram Bot
+            if not p_telegram.is_alive():
+                print(f"{Fore.RED}⚠️ Telegram Bot stopped. Restarting...{Style.RESET_ALL}")
+                p_telegram = create_process("TelegramBot", start_telegram, (queues,))
+                
     except KeyboardInterrupt:
         print(f"\n{Fore.YELLOW}🛑 Shutting down system...{Style.RESET_ALL}")
-        for p in processes:
-            if p.is_alive():
-                p.terminate()
-                p.join()
+        if p_whatsapp.is_alive(): p_whatsapp.terminate()
+        if p_telegram.is_alive(): p_telegram.terminate()
+        p_whatsapp.join()
+        p_telegram.join()
         print(f"{Fore.GREEN}👋 System shutdown complete.{Style.RESET_ALL}")
 
 if __name__ == "__main__":

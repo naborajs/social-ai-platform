@@ -6,6 +6,7 @@ from app.core.security import security_manager
 
 def init_db():
     conn = sqlite3.connect(DB_NAME)
+    conn.execute("PRAGMA journal_mode=WAL;")
     c = conn.cursor()
     
     # Users table
@@ -140,6 +141,7 @@ def init_db():
 
 def register_user(username, email, password, platform=None, platform_id=None, avatar_url=None, bio=None):
     conn = sqlite3.connect(DB_NAME)
+    conn.execute("PRAGMA journal_mode=WAL;")
     c = conn.cursor()
     
     import secrets
@@ -173,6 +175,7 @@ def register_user(username, email, password, platform=None, platform_id=None, av
 def update_system_prompt(user_id, system_prompt):
     """Update the user's custom system prompt (persona)."""
     conn = sqlite3.connect(DB_NAME)
+    conn.execute("PRAGMA journal_mode=WAL;")
     c = conn.cursor()
     try:
         c.execute("UPDATE users SET system_prompt = ? WHERE id = ?", (system_prompt, user_id))
@@ -195,6 +198,7 @@ def get_user_system_prompt(user_id):
 # Updated get_user_by_platform to return system_prompt
 def get_user_by_platform(platform, platform_id):
     conn = sqlite3.connect(DB_NAME)
+    conn.execute("PRAGMA journal_mode=WAL;")
     c = conn.cursor()
     if platform == "whatsapp":
         c.execute("SELECT id, username, gemini_api_key, system_prompt FROM users WHERE whatsapp_id = ?", (platform_id,))
@@ -212,6 +216,7 @@ def get_user_by_platform(platform, platform_id):
 def get_user_by_username(username):
     """Retrieve user info by username."""
     conn = sqlite3.connect(DB_NAME)
+    conn.execute("PRAGMA journal_mode=WAL;")
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
     c.execute("SELECT id, username, whatsapp_id, telegram_id, preferred_platform FROM users WHERE username = ?", (username,))
@@ -221,6 +226,7 @@ def get_user_by_username(username):
 
 def verify_user(username, password):
     conn = sqlite3.connect(DB_NAME)
+    conn.execute("PRAGMA journal_mode=WAL;")
     c = conn.cursor()
     c.execute("SELECT id, password_hash FROM users WHERE username = ?", (username,))
     user = c.fetchone()
@@ -316,6 +322,7 @@ def get_user_api_key(user_id):
 def get_user_by_id(user_id):
     """Retrieve basic user info by internal ID."""
     conn = sqlite3.connect(DB_NAME)
+    conn.execute("PRAGMA journal_mode=WAL;")
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
     c.execute("SELECT id, username, whatsapp_id, telegram_id, preferred_platform FROM users WHERE id = ?", (user_id,))
@@ -326,16 +333,17 @@ def get_user_by_id(user_id):
 
 def log_conversation(user_id, message, response):
      conn = sqlite3.connect(DB_NAME)
+     conn.execute("PRAGMA journal_mode=WAL;")
      c = conn.cursor()
      c.execute("INSERT INTO conversations (user_id, message, response) VALUES (?, ?, ?)", (user_id, message, response))
      conn.commit()
      conn.close()
 
 # --- State Management Functions ---
-
 def set_state(platform_id, platform, state, data=None):
     """Set or update the conversation state for a user (by platform ID)."""
     conn = sqlite3.connect(DB_NAME)
+    conn.execute("PRAGMA journal_mode=WAL;")
     c = conn.cursor()
     data_json = json.dumps(data) if data else "{}"
     c.execute('''INSERT INTO user_states (platform_id, platform, state, data) 
@@ -369,6 +377,7 @@ def clear_state(platform_id):
 def send_friend_request(from_id, to_username):
     """Send a friend request by username."""
     conn = sqlite3.connect(DB_NAME)
+    conn.execute("PRAGMA journal_mode=WAL;")
     c = conn.cursor()
     c.execute("SELECT id FROM users WHERE username = ?", (to_username,))
     to_user = c.fetchone()
@@ -401,6 +410,7 @@ def get_friend_requests(user_id):
 def accept_friend_request(user_id, from_username):
     """Accept a pending friend request."""
     conn = sqlite3.connect(DB_NAME)
+    conn.execute("PRAGMA journal_mode=WAL;")
     c = conn.cursor()
     c.execute("SELECT id FROM users WHERE username = ?", (from_username,))
     from_user = c.fetchone()
@@ -434,6 +444,7 @@ def create_group(name, creator_id):
     import uuid
     group_id = str(uuid.uuid4())[:8]
     conn = sqlite3.connect(DB_NAME)
+    conn.execute("PRAGMA journal_mode=WAL;")
     c = conn.cursor()
     c.execute("INSERT INTO groups (id, name, created_by) VALUES (?, ?, ?)", (group_id, name, creator_id))
     c.execute("INSERT INTO group_members (group_id, user_id) VALUES (?, ?)", (group_id, creator_id))
@@ -560,6 +571,7 @@ def get_user_contact_info(username):
 
 def log_private_message(from_id, to_id, content):
     conn = sqlite3.connect(DB_NAME)
+    conn.execute("PRAGMA journal_mode=WAL;")
     c = conn.cursor()
     c.execute("INSERT INTO private_messages (from_id, to_id, content) VALUES (?, ?, ?)", (from_id, to_id, content))
     conn.commit()

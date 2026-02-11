@@ -10,6 +10,8 @@
 
 An intelligent, production-ready AI social platform that brings personalized chatbot experiences to WhatsApp and Telegram. Each user gets a unique identity with customizable AI personalities, making conversations feel truly human.
 ## 🔄 Recent Updates
+- **Version**: v3.5 (Resilient & Persistent)
+- **Status**: Stable / Production Ready
 - **v3.4**: WhatsApp Pairing Code (OTP) Activation 🔑
 - **v3.4**: OTP-based Login System (`/otp_login`, `/verify`) 🔐
 - **v3.3**: Hardened Security & Prompt Injection Detection 🛡️
@@ -137,6 +139,13 @@ This starts both WhatsApp and Telegram bots simultaneously.
 3. Run `python main.py`
 4. Start chatting with your bot on Telegram
 
+### ⚙️ Persistence & Reliability
+This version introduces a **Self-Healing** architecture:
+- **Auto-Restarter**: The `main.py` controller monitors background processes and automatically restarts them if they fail.
+- **SQLite WAL Mode**: Prevents database corruption and improves concurrent performance.
+- **Centralized Data**: All stateful files are kept in the `./data` folder for easy backup.
+- **Persistent Pairing**: Sessions are saved locally, so you only need to pair once.
+
 ---
 
 ## 🏗️ Architecture
@@ -148,7 +157,9 @@ social-ai-platform/
 ├── cli_chatbot.py            # Standalone CLI chatbot
 ├── requirements.txt          # Python dependencies
 ├── .env                      # Environment variables
-├── whatsapp_bot.db          # SQLite database
+├── data/                     # PERSISTENT STORAGE [NEW]
+│   ├── whatsapp_bot.db      # Users, Friends, Stats
+│   └── whatsapp_session.sqlite3 # Logged-in Session
 │
 ├── app/
 │   ├── core/
@@ -506,6 +517,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - [ ] Web dashboard for user management
 - [x] Group chat support
+- [x] **High Availability**: Automatic process restarter for WhatsApp and Telegram.
+- [x] **Data Integrity**: All databases and sessions stored in a secure `data/` directory.
+- [x] **Robust Persistence**: SQLite WAL mode enabled for safe data handling during restarts.
+- [x] **One-Time Pairing**: Logged-in WhatsApp sessions persist even after server reboots.
 - [ ] Voice message processing
 - [ ] Multi-language support
 - [x] User-to-user messaging (social features)

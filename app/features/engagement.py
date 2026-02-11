@@ -1,6 +1,6 @@
 import time
 import threading
-from database import get_inactive_users
+from app.core.database import get_inactive_users
 
 class EngagementManager:
     def __init__(self, telegram_bot=None, whatsapp_client=None):
