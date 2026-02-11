@@ -9,12 +9,13 @@ from app.core.bot_core import UnifiedBot
 from app.core.config import BOT_WHATSAPP_NUMBER, WHATSAPP_SESSION
 from app.core.database import get_inactive_users
 from dotenv import load_dotenv
+from colorama import Fore, Style
 
 load_dotenv()
 
 import threading
 
-def run_whatsapp_bot(queues):
+def run_whatsapp_bot(queues, login_info=None):
     print("🚀 Starting WhatsApp Bot (Unified)...")
     
     # Initialize Unified Bot with Queues for IPC
@@ -22,6 +23,8 @@ def run_whatsapp_bot(queues):
 
     # Initialize Neonize Client
     client = NewClient(WHATSAPP_SESSION)
+    
+    # ... (rest of the listeners and events) ...
 
     def queue_listener():
         """Thread to listen for cross-platform messages destined for WhatsApp."""
@@ -119,21 +122,23 @@ def run_whatsapp_bot(queues):
         except Exception as e:
             print(f"❌ Error processing message: {e}")
 
-    print("📱 Please scan the QR code if prompted.")
-    
-    if BOT_WHATSAPP_NUMBER and not os.path.exists(WHATSAPP_SESSION):
-        print(f"🔑 Generating Pairing Code for: {BOT_WHATSAPP_NUMBER}")
-        # We need to connect first to trigger the pairing process or use pair_code
-        # In neonize, it's often handled via an event or direct call before connect
-        # But wait, neonize-python's current version often handles it like this:
-        try:
-             # This will show the pairing code in the terminal
-             code = client.pair_code(BOT_WHATSAPP_NUMBER, show=True)
-             print(f"\n🚀 PAIRING CODE: {code}\n")
-             print("Please enter this code on your phone in WhatsApp 'Link a Device'.")
-        except Exception as e:
-             print(f"⚠️ Could not generate pairing code: {e}")
+    if login_info and not os.path.exists(WHATSAPP_SESSION):
+        method = login_info.get("method")
+        
+        if method == "pairing":
+            target_number = login_info.get("number")
+            if target_number:
+                print(f"🔑 Generating Pairing Code for: {target_number}")
+                try:
+                     code = client.pair_code(target_number, show=True)
+                     print(f"\n🚀 PAIRING CODE: {Fore.GREEN}{code}{Style.RESET_ALL}\n")
+                     print("Please enter this code on your phone in WhatsApp 'Link a Device' -> 'Link with phone number instead'.")
+                except Exception as e:
+                     print(f"⚠️ Could not generate pairing code: {e}. Falling back to QR...")
+        else:
+            print("📱 Please scan the QR code below when it appears.")
 
+    print(f"{Fore.WHITE}Connecting to WhatsApp...{Style.RESET_ALL}")
     client.connect()
 
 if __name__ == "__main__":

@@ -18,11 +18,11 @@ try:
 except AttributeError:
     pass
 
-def start_whatsapp(queue):
+def start_whatsapp(queue, login_info=None):
     """Function to run WhatsApp bot in a separate process."""
     try:
         from app.bots.whatsapp_bot import run_whatsapp_bot
-        run_whatsapp_bot(queue)
+        run_whatsapp_bot(queue, login_info)
     except Exception as e:
         print(f"{Fore.RED}❌ WhatsApp Bot Crashed: {e}{Style.RESET_ALL}")
 
@@ -34,16 +34,29 @@ def start_telegram(queue):
     except Exception as e:
         print(f"{Fore.RED}❌ Telegram Bot Crashed: {e}{Style.RESET_ALL}")
 
-def main():
-    print(f"{Fore.CYAN}="*50)
-    print(f"{Fore.YELLOW}🚀 Starting Unified Bot System v3.5 (Resilient)...{Style.RESET_ALL}")
-    print(f"{Fore.CYAN}="*50)
-
-    # Communication Queues for Cross-Platform Messaging
-    queues = {
-        "whatsapp": multiprocessing.Queue(),
-        "telegram": multiprocessing.Queue()
-    }
+    # Initial check for WhatsApp setup
+    from app.core.config import WHATSAPP_SESSION, BOT_WHATSAPP_NUMBER
+    login_info = None
+    
+    if not os.path.exists(WHATSAPP_SESSION):
+        print(f"\n{Fore.CYAN}--- WhatsApp Login Setup ---{Style.RESET_ALL}")
+        print("1. 🔑 **Link with Phone Number** (Pairing Code)")
+        print("2. 📱 **Scan QR Code**")
+        
+        choice = input(f"{Fore.YELLOW}Select option (1 or 2): {Style.RESET_ALL}").strip()
+        
+        if choice == "1":
+            target_number = BOT_WHATSAPP_NUMBER
+            if not target_number:
+                target_number = input(f"{Fore.YELLOW}Enter your WhatsApp number (with country code, e.g., 919876543210): {Style.RESET_ALL}").strip()
+            
+            if target_number:
+                login_info = {"method": "pairing", "number": target_number}
+            else:
+                print("⚠️ No number provided. Falling back to QR...")
+                login_info = {"method": "qr"}
+        else:
+            login_info = {"method": "qr"}
 
     def create_process(name, target, args):
         p = multiprocessing.Process(target=target, args=args, name=name)
@@ -51,7 +64,7 @@ def main():
         return p
 
     # Initial start
-    p_whatsapp = create_process("WhatsAppBot", start_whatsapp, (queues,))
+    p_whatsapp = create_process("WhatsAppBot", start_whatsapp, (queues, login_info))
     p_telegram = create_process("TelegramBot", start_telegram, (queues,))
 
     print(f"\n{Fore.WHITE}✅ Both bots are connected via IPC Queues.")

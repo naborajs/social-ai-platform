@@ -126,12 +126,14 @@ python main.py
 This starts both WhatsApp and Telegram bots simultaneously.
 
 ### WhatsApp Setup
-1.  Set `BOT_WHATSAPP_NUMBER` in your `.env` file.
+1.  Set `BOT_WHATSAPP_NUMBER` in your `.env` file (Optional).
 2.  Run `python main.py`.
-3.  **Activation**: The bot will generate a **Pairing Code** shown in your terminal.
-4.  On your phone (WhatsApp) -> Settings -> Linked Devices -> Link a Device -> **Link with phone number instead**.
-5.  Enter the code shown in the terminal.
-6.  The bot is now connected! (Or scan the QR code if no number is provided).
+3.  **Login Choice**: The system will prompt you to choose between:
+    - **1. Pairing Code**: Enter your number if not set in `.env`, and link via code.
+    - **2. QR Code**: Scan the QR code directly.
+4.  On your phone (WhatsApp) -> Settings -> Linked Devices -> Link a Device.
+5.  Follow the terminal instructions for the chosen method.
+6.  The bot is now connected!
 
 ### Telegram Setup
 1. Get a bot token from [@BotFather](https://t.me/botfather)
