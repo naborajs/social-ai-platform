@@ -10,10 +10,10 @@
 
 An intelligent, production-ready AI social platform that brings personalized chatbot experiences to WhatsApp and Telegram. Each user gets a unique identity with customizable AI personalities, making conversations feel truly human.
 ## 🔄 Recent Updates
-- **Version**: v3.8 Platinum (Social & Settings Upgrade)
-- **Status**: Stable / Production Ready
-- **v3.8 Platinum**: Interactive Settings, Usage Dashboard, & Smart Social Tools 💎
-- **v3.7 Gold**: Premium Onboarding, Advanced AI Personas, & Centralized Error Handling 🏆
+- **Version**: v4.0 Diamond (The Social AI Update)
+- **Status**: Production Ready / Premium Content Creator Edition
+- **v4.0 Diamond**: Public Feed, Expiring Stories, Multimodal AI, & Creator Suite 💎
+- **v3.8 Platinum**: Interactive Settings, Usage Dashboard, & Smart Social Tools 🏆
 - **v3.7**: Fixed `NameError` in `main.py` and improved process monitoring 🛠️
 - **v3.4**: WhatsApp Pairing Code (OTP) Activation 🔑
 - **v3.4**: OTP-based Login System (`/otp_login`, `/verify`) 🔐
@@ -59,15 +59,22 @@ No complex commands! Registration is conversational:
 - ✅ Telegram (via python-telegram-bot)
 - 📱 Unified backend for both platforms
 
-### 👥 **Social & Discovery**
-- **Friend System**: `/add_friend`, `/friends`, `/accept`
-- **Discovery**: `/search <query>` - Find and discover new people
-- **Profiles**: `/info <username>` - Mutual friends & bio view
-- **Unified Identity**: Cross-platform identity synchronization
+### 💎 **v4.0 Diamond Social Layer**
+- **Public Feed**: `/post <text>` - Share updates with the global community
+- **Expiring Stories**: `/story <text>` - Share 24-hour visual/text updates
+- **Reactions**: `/like <id>` - React to community content
+- **Discovery**: `/search`, `/info` - Advanced social connectivity
+- **Verified Status**: Exclusive Diamond badges for creators & VIPs
 
-### 📊 **Transparency & Control**
-- **Settings Menu**: `/settings` (Alias: `/s`) - Full control over AI & Notifications
-- **Usage Stats**: `/usage` (Alias: `/u`) - Detailed interaction report card
+### 🎮 **Content Creator Suite**
+- **Broadcasting**: `/broadcast <msg>` - Reach every user instantly (Owner-only)
+- **AI Copywriter**: `/caption <topic>` - Viral script and caption generator
+- **AI Art Engine**: `/imagine <prompt>` - Generate artistic descriptions/images
+
+### 🧠 **Advanced AI & Multimodal**
+- **Image Recognition**: Gemini 2.0 now "sees" and discusses images you send
+- **Interactive Personas**: Deep mood and personality synchronization
+- **Advanced Gamification**: Message-based leveling and badge system
 
 ### 🎨 **Social-Ready Features**
 - Unique user profiles with avatars

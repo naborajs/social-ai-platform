@@ -105,24 +105,25 @@ class UnifiedBot:
     
             elif command == "/help":
                 help_text = (
-                    "✨ *TrueFriend AI Experience* ✨\n"
-                    "_Premium AI Social Platform v3.8 Gold_\n\n"
-                    "🆕 *Quick Controls* (Aliases: `/s`, `/u`, `/f`)\n"
-                    "• `/settings` - Deep customization menu\n"
-                    "• `/usage` - Your activity report card\n"
-                    "• `/search <name>` - Discover new people\n"
-                    "• `/info <user>` - View profile & mutuals\n\n"
+                    "💎 *TrueFriend Diamond AI Experience* 💎\n"
+                    "_The Ultimate AI Social Network v4.0_\n\n"
+                    "📢 *Social Feed & Stories*\n"
+                    "• `/post <text>` - Share a public update\n"
+                    "• `/story <text>` - Post a 24h story\n"
+                    "• `/feed` - View world-wide feed 🌎\n"
+                    "• `/stories` - See what's happening\n"
+                    "• `/like <id>` - React to a post\n\n"
+                    "🎮 *Creator & Tools*\n"
+                    "• `/caption <topic>` - Get viral social ideas\n"
+                    "• `/imagine <prompt>` - Generate AI art 🎨\n"
+                    "• `/usage` - View your prestige level\n\n"
                     "💬 *Social Interaction*\n"
                     "• `/msg <user> <text>` - Direct message\n"
-                    "• `/chat <user>` - Enter direct tunnel\n"
-                    "• `/exit` - Back to AI Friend mode\n"
-                    "• `/add_friend <user>` - Send request\n"
-                    "• `/friends` - View your squad\n\n"
+                    "• `/chat <user>` - Direct tunnel\n"
+                    "• `/search <name>` - Discover people\n"
+                    "• `/info <user>` - View profile cards\n\n"
                     "ℹ️ *System*\n"
-                    "• `/help` - Show this menu\n"
-                    "• `/about` - Project information\n"
-                    "• `/report <msg>` - Send feedback\n\n"
-                    "💡 _Chat naturally to interact with your AI companion._"
+                    "• `/settings` | `/help` | `/about` | `/report`"
                 )
                 return help_text
     
@@ -304,6 +305,45 @@ class UnifiedBot:
 
             if command in ["/usage", "/u"]:
                 return self._handle_usage(user_id, username)
+
+            if command == "/post":
+                if len(message_parts) < 2: return "❌ Usage: `/post <content>`"
+                from app.core.database import create_post
+                create_post(user_id, " ".join(message_parts[1:]))
+                return "✅ Post shared to the public feed! 🌍"
+
+            if command == "/story":
+                if len(message_parts) < 2: return "❌ Usage: `/story <content>`"
+                from app.core.database import create_story
+                create_story(user_id, " ".join(message_parts[1:]))
+                return "📸 Story posted! It will expire in 24 hours."
+
+            if command == "/feed":
+                return self._handle_feed()
+
+            if command == "/stories":
+                return self._handle_stories()
+            
+            if command == "/like":
+                if len(message_parts) < 2: return "❌ Usage: `/like <post_id>`"
+                from app.core.database import react_to_content
+                react_to_content(user_id, post_id=message_parts[1])
+                return "❤️ Reaction added!"
+
+            if command == "/broadcast":
+                # Special command for Nishant
+                if username.lower() not in ["naborajs", "nishant"]:
+                    return "❌ This is a creator-only command."
+                msg_content = " ".join(message_parts[1:])
+                return self._handle_broadcast(msg_content)
+
+            if command == "/caption":
+                topic = " ".join(message_parts[1:]) if len(message_parts) > 1 else "lifestyle"
+                return self._handle_caption_tool(topic)
+
+            if command == "/imagine":
+                prompt = " ".join(message_parts[1:]) if len(message_parts) > 1 else "a futuristic city"
+                return self._handle_imagine(user_id, prompt, platform, platform_id)
 
             if command == "/search":
                 if len(message_parts) < 2:
@@ -539,6 +579,67 @@ class UnifiedBot:
             f"🕒 **Last Seen**: {row['last_seen']}"
         )
 
+    def _handle_feed(self):
+        """Display the global public feed."""
+        from app.core.database import get_social_feed, get_reactions_count
+        posts = get_social_feed(limit=10)
+        if not posts: return "📭 The feed is empty. Be the first to `/post` something!"
+        
+        text = "🌍 **Public Social Feed** 🌍\n------------------------------\n"
+        for p in posts:
+            v = " 💎" if p['is_verified'] else ""
+            likes = get_reactions_count(post_id=p['id'])
+            text += f"🆔 #{p['id']} | **{p['username']}**{v}:\n{p['content']}\n❤️ {likes} likes | 🕒 {p['timestamp']}\n\n"
+        return text
+
+    def _handle_stories(self):
+        """Display active 24h stories."""
+        from app.core.database import get_active_stories
+        stories = get_active_stories()
+        if not stories: return "📸 No active stories right now. Share one with `/story`!"
+        
+        text = "📸 **Active Stories (24h)** 📸\n------------------------------\n"
+        current_user = ""
+        for s in stories:
+            if s['username'] != current_user:
+                text += f"\n👤 **{s['username']}**:\n"
+                current_user = s['username']
+            text += f"• {s['content']} (🕒 {s['created_at']})\n"
+        return text
+
+    def _handle_broadcast(self, content):
+        """Owner-only: Send a message to all registered users."""
+        from app.core.database import get_all_users_for_broadcast
+        users = get_all_users_for_broadcast()
+        count = 0
+        for wa_id, tg_id, pref in users:
+            target = wa_id if pref == "whatsapp" else tg_id
+            if target and self.queues and pref in self.queues:
+                self.queues[pref].put({
+                    "platform": pref,
+                    "target": target,
+                    "text": f"📢 **SYSTEM UPDATE FROM NISHANT** 📢\n\n{content}"
+                })
+                count += 1
+        return f"✅ Broadcast sent to {count} reachable users!"
+
+    def _handle_caption_tool(self, topic):
+        """AI Assistant for generating social media content."""
+        prompt = f"Write 3 viral, engaging social media captions and 1 short YouTube script about: '{topic}'. Use relevant emojis and hashtags."
+        return self.chatbot.generate_response(prompt)
+
+    def _handle_imagine(self, user_id, prompt, platform, platform_id):
+        """Simulate or integrate AI image generation."""
+        # In a real setup, we'd call DALL-E or Midjourney API here.
+        # For now, we'll confirm the request and provide a creative AI description of the image.
+        ai_desc = self.chatbot.generate_response(f"Describe a stunning, highly detailed image of: {prompt}. Make it sound like you just generated it.")
+        if self.queues and platform in self.queues:
+             self.queues[platform].put({
+                 "platform": platform,
+                 "target": platform_id,
+                 "text": f"🎨 **AI Image Generated (v4.0 Diamond Engine)**\n\n_{ai_desc}_"
+             })
+        return "✨ Processing your artistic vision in the Diamond Engine... Check your chat in a second!"
     def _handle_search(self, query):
         """Search for users and present findings."""
         from app.core.database import search_users

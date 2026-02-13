@@ -94,6 +94,50 @@ def init_db():
                     FOREIGN KEY(to_id) REFERENCES users(id)
                 )''')
 
+    # Posts table (v4.0)
+    c.execute('''CREATE TABLE IF NOT EXISTS posts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER,
+                    content TEXT,
+                    image_url TEXT,
+                    is_public INTEGER DEFAULT 1,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY(user_id) REFERENCES users(id)
+                )''')
+
+    # Stories table (v4.0 - Expiring)
+    c.execute('''CREATE TABLE IF NOT EXISTS stories (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER,
+                    content TEXT,
+                    image_url TEXT,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    expires_at DATETIME,
+                    FOREIGN KEY(user_id) REFERENCES users(id)
+                )''')
+
+    # Reactions table (v4.0)
+    c.execute('''CREATE TABLE IF NOT EXISTS reactions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    post_id INTEGER,
+                    story_id INTEGER,
+                    user_id INTEGER,
+                    type TEXT DEFAULT 'like',
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY(post_id) REFERENCES posts(id),
+                    FOREIGN KEY(story_id) REFERENCES stories(id),
+                    FOREIGN KEY(user_id) REFERENCES users(id)
+                )''')
+
+    # Achievements table (v4.0)
+    c.execute('''CREATE TABLE IF NOT EXISTS achievements (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER,
+                    badge_name TEXT,
+                    achieved_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY(user_id) REFERENCES users(id)
+                )''')
+
     # Reports table
     c.execute('''CREATE TABLE IF NOT EXISTS reports (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -119,7 +163,9 @@ def init_db():
         ("active_chat_id", "INTEGER"), # For context-based chatting
         ("gender", "TEXT"), # user's gender
         ("ai_gender", "TEXT"), # AI's preferred gender
-        ("ai_mood", "TEXT DEFAULT 'supportive'") # current AI mood
+        ("ai_mood", "TEXT DEFAULT 'supportive'"), # current AI mood
+        ("is_verified", "INTEGER DEFAULT 0"), # v4.0 Diamond logic
+        ("level", "INTEGER DEFAULT 1")
     ]
     
     for col_name, col_type in columns:
@@ -606,6 +652,92 @@ def remove_friend(user_id, friend_username):
         return True, f"Friendship with {friend_username} removed."
     conn.close()
     return False, "Friend not found."
+def create_post(user_id, content, image_url=None, is_public=1):
+    """Create a new social post."""
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("INSERT INTO posts (user_id, content, image_url, is_public) VALUES (?, ?, ?, ?)", 
+              (user_id, content, image_url, is_public))
+    conn.commit()
+    conn.close()
+    return True
+
+def create_story(user_id, content, image_url=None, hours=24):
+    """Create an expiring story."""
+    from datetime import datetime, timedelta
+    expires_at = (datetime.now() + timedelta(hours=hours)).strftime('%Y-%m-%d %H:%M:%S')
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("INSERT INTO stories (user_id, content, image_url, expires_at) VALUES (?, ?, ?, ?)", 
+              (user_id, content, image_url, expires_at))
+    conn.commit()
+    conn.close()
+    return True
+
+def get_social_feed(limit=20):
+    """Fetch global public feed with usernames."""
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute('''SELECT posts.*, users.username, users.is_verified FROM posts 
+                 JOIN users ON posts.user_id = users.id 
+                 WHERE posts.is_public = 1 
+                 ORDER BY posts.timestamp DESC LIMIT ?''', (limit,))
+    results = [dict(r) for r in c.fetchall()]
+    conn.close()
+    return results
+
+def get_active_stories():
+    """Fetch current stories that haven't expired."""
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute('''SELECT stories.*, users.username FROM stories 
+                 JOIN users ON stories.user_id = users.id 
+                 WHERE stories.expires_at > CURRENT_TIMESTAMP 
+                 ORDER BY stories.created_at DESC''')
+    results = [dict(r) for r in c.fetchall()]
+    conn.close()
+    return results
+
+def react_to_content(user_id, post_id=None, story_id=None, reaction_type='like'):
+    """Add a reaction to a post or story."""
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("INSERT INTO reactions (user_id, post_id, story_id, type) VALUES (?, ?, ?, ?)", 
+              (user_id, post_id, story_id, reaction_type))
+    conn.commit()
+    conn.close()
+    return True
+
+def get_reactions_count(post_id=None, story_id=None):
+    """Get count of reactions for a specific content."""
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    if post_id:
+        c.execute("SELECT COUNT(*) FROM reactions WHERE post_id = ?", (post_id,))
+    else:
+        c.execute("SELECT COUNT(*) FROM reactions WHERE story_id = ?", (story_id,))
+    count = c.fetchone()[0]
+    conn.close()
+    return count
+
+def set_verified_status(user_id, status=1):
+    """Mark a user as verified (💎 Diamond status)."""
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("UPDATE users SET is_verified = ? WHERE id = ?", (status, user_id))
+    conn.commit()
+    conn.close()
+
+def get_all_users_for_broadcast():
+    """Retrieve all users with linked platform IDs for owner broadcasts."""
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("SELECT whatsapp_id, telegram_id, preferred_platform FROM users")
+    users = c.fetchall()
+    conn.close()
+    return users
 def search_users(query, limit=10):
     """Search for users by username or display name."""
     conn = sqlite3.connect(DB_NAME)

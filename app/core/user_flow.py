@@ -54,6 +54,10 @@ class ConversationManager:
             if len(text) < 3:
                 return "⚠️ *Username must be at least 3 characters.* Try again:", None, False
             
+            from app.core.database import get_user_by_username
+            if get_user_by_username(text):
+                return f"❌ *The username '{text}' is already taken.* Please choose another one:", None, False
+
             # Save username, move to next step
             data['username'] = text
             set_state(platform_id, platform, self.STATE_REG_EMAIL, data)
