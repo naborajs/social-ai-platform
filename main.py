@@ -34,6 +34,13 @@ def start_telegram(queue):
     except Exception as e:
         print(f"{Fore.RED}❌ Telegram Bot Crashed: {e}{Style.RESET_ALL}")
 
+def main():
+    """Main entry point for the Multi-Bot system."""
+    queues = {
+        "whatsapp": multiprocessing.Queue(),
+        "telegram": multiprocessing.Queue()
+    }
+
     # Initial check for WhatsApp setup
     from app.core.config import WHATSAPP_SESSION, BOT_WHATSAPP_NUMBER
     login_info = None
