@@ -32,32 +32,45 @@ def run_telegram_bot(queues):
     application = ApplicationBuilder().token(telegram_token).build()
 
     def queue_listener():
-        """Thread to listen for cross-platform messages destined for Telegram."""
+        """Robust thread to listen for cross-platform messages destined for Telegram."""
         if not queues or "telegram" not in queues:
             return
             
         tg_queue = queues["telegram"]
         bot = application.bot
+        
+        # Build a persistent loop for this thread
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
+        
+        print("📲 Telegram IPC Listener [ACTIVE]")
 
         while True:
             try:
                 # Get message from our specific queue
                 item = tg_queue.get()
+                if not item: continue
+                
                 target = item.get("target")
-                text = item.get("text")
+                text = item.get("text", "")
                 image_path = item.get("image_path")
                 
-                if target and text:
-                    print(f"📥 IPC -> Telegram: Sending to {target}")
+                if target:
                     if image_path and os.path.exists(image_path):
-                        with open(image_path, 'rb') as photo:
-                            loop.run_until_complete(bot.send_photo(chat_id=target, photo=photo, caption=text, parse_mode='Markdown'))
-                    else:
+                        try:
+                            with open(image_path, 'rb') as photo:
+                                loop.run_until_complete(bot.send_photo(chat_id=target, photo=photo, caption=text, parse_mode='Markdown'))
+                            print(f"🖼️ IPC -> Telegram: Sent Photo to {target}")
+                        except Exception as e:
+                            # Fallback if send_photo fails
+                            loop.run_until_complete(bot.send_message(chat_id=target, text=f"{text}\n\n📎 [File]: {image_path}", parse_mode='Markdown'))
+                            print(f"📥 IPC -> Telegram: Sent Message (Photo Fallback) to {target}: {e}")
+                    elif text:
                         loop.run_until_complete(bot.send_message(chat_id=target, text=text, parse_mode='Markdown'))
+                        print(f"💬 IPC -> Telegram: Sent Message to {target}")
+                        
             except Exception as e:
-                print(f"❌ Telegram Queue Listener Error: {e}")
+                print(f"⚠️ Telegram IPC Listener Warning: {e}")
                 time.sleep(2)
 
     # Start Queue Listener Thread

@@ -10,8 +10,9 @@
 
 An intelligent, production-ready AI social platform that brings personalized chatbot experiences to WhatsApp and Telegram. Each user gets a unique identity with customizable AI personalities, making conversations feel truly human.
 ## 🔄 Recent Updates
-- **Version**: v3.7 (Stability Fix)
+- **Version**: v3.7 Gold (Major Feature Upgrade)
 - **Status**: Stable / Production Ready
+- **v3.7 Gold**: Premium Onboarding, Advanced AI Personas, & Centralized Error Handling 🏆
 - **v3.7**: Fixed `NameError` in `main.py` and improved process monitoring 🛠️
 - **v3.4**: WhatsApp Pairing Code (OTP) Activation 🔑
 - **v3.4**: OTP-based Login System (`/otp_login`, `/verify`) 🔐
@@ -67,6 +68,8 @@ No complex commands! Registration is conversational:
 - Conversation history logging
 - Activity tracking (last seen)
 - **Technical Documentation**: [System Architecture](app/docs/system_architecture.md)
+- **Error Handling**: Centralized system with graceful user messages and owner logs
+- **IPC Protocol**: Standardized cross-platform reliability
 
 ---
 

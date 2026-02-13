@@ -26,10 +26,10 @@ class ConversationManager:
 
     # Personas
     PERSONAS = {
-        "1": "You are a supportive, enthusiastic best friend. You use emojis, give compliments, and encourage the user.",
-        "2": "You are a sarcastic roast master. You make fun of the user playfully, you are witty, and you don't hold back.",
-        "3": "You are a professional, highly efficient executive assistant. You are polite, concise, and formal.",
-        "4": "You are a mystical wizard. You speak in riddles, use archaic language, and reference magic."
+        "1": "You are a supportive, enthusiastic best friend. You use emojis, give compliments, and encourage the user with a warm, caring vibe.",
+        "2": "You are a sarcastic roast master. You make fun of the user playfully, you are witty, sassy, and never hold back on the humor.",
+        "3": "You are a professional, highly efficient executive assistant. You are polite, concise, formal, and focused on excellence.",
+        "4": "You are a mystical wizard. You speak in riddles, use archaic language, and reference ancient magic and hidden wisdom."
     }
 
     def __init__(self):
@@ -52,42 +52,46 @@ class ConversationManager:
         if state == self.STATE_REG_USERNAME:
             # Validate Username (Simple check)
             if len(text) < 3:
-                return "❌ Username must be at least 3 characters. Try again:", None, False
+                return "⚠️ *Username must be at least 3 characters.* Try again:", None, False
             
             # Save username, move to next step
             data['username'] = text
             set_state(platform_id, platform, self.STATE_REG_EMAIL, data)
-            return "📧 Great! Now, what is your **Email Address**?\n\n_This helps in account recovery if needed._", None, False
+            return "✨ [Step 2/6] **Almost there!**\n\nWhat is your **Email Address**?\n\n_This helps us secure your account and recover it if you ever forget your password._", None, False
 
         elif state == self.STATE_REG_EMAIL:
             # Validate Email
             if "@" not in text or "." not in text:
-                return "❌ That doesn't look like a valid email. Please try again:", None, False
+                return "⚠️ *That doesn't look like a valid email.* Please try again:", None, False
                 
             data['email'] = text
             set_state(platform_id, platform, self.STATE_REG_PASSWORD, data)
-            return "🔐 **Secure your account**. Create a **Secret Password**:\n\n_Make it strong! Remember it well._", None, False
+            return "🔐 [Step 3/6] **Let's keep it secure!**\n\nCreate a **Strong Password**:\n\n_Tip: Use a mix of letters and numbers for maximum safety._", None, False
 
         elif state == self.STATE_REG_PASSWORD:
             if len(text) < 6:
-                return "❌ Password must be at least 6 characters. Try again:", None, False
+                return "⚠️ *Your password should be at least 6 characters.* Try again:", None, False
                 
             data['password'] = text
             set_state(platform_id, platform, self.STATE_REG_GENDER, data)
-            return "👤 What is your **Gender**? (he/she)\n\n_This helps me tailor my style and personality for you._", None, False
+            return "👤 [Step 4/6] **Tell me about yourself.**\n\nWhat is your **Gender**? (he/she)\n\n_I'll use this to tailor my tone and how I address you!_", None, False
 
         elif state == self.STATE_REG_GENDER:
             gender = "she" if "she" in text.lower() else "he"
             data['gender'] = gender
             # Auto-align AI gender with user gender
-            data['ai_gender'] = gender
+            data['ai_gender'] = "she" if gender == "he" else "he" # Typical companion default
             
             set_state(platform_id, platform, self.STATE_REG_AVATAR, data)
             
             # Show Avatar Options
-            msg = "🎨 **Let's pick an Identity!** Choose your **Avatar**:\n\n"
-            msg += "1️⃣ Adventurer Felix\n2️⃣ Adventurer Aneka\n3️⃣ Midnight Warrior\n4️⃣ Retro Bot\n\n_Reply with the number (1-4) or type a custom image URL._"
-            return msg, self.AVATARS, False # Return avatars dict for UI handling
+            msg = "🎨 [Step 5/6] **Let's pick an Identity!**\n\nChoose your **Avatar**:\n\n"
+            msg += "1️⃣ **Adventurer Felix** (Bold & Dynamic)\n"
+            msg += "2️⃣ **Adventurer Aneka** (Wise & Swift)\n"
+            msg += "3️⃣ **Midnight Warrior** (Sleek & Mysterious)\n"
+            msg += "4️⃣ **Retro Bot** (Classic & Techie)\n\n"
+            msg += "_Reply with **1, 2, 3, or 4** to select your look._"
+            return msg, self.AVATARS, False 
 
         elif state == self.STATE_REG_AVATAR:
             avatar_url = text
@@ -97,8 +101,12 @@ class ConversationManager:
             data['avatar_url'] = avatar_url
             set_state(platform_id, platform, self.STATE_REG_PERSONA, data)
             
-            msg = "🧠 **Final Step!** Choose my **Personality**:\n\n"
-            msg += "1️⃣ 🤗 Best Friend (Supportive)\n2️⃣ 🔥 Roast Master (Sarcastic)\n3️⃣ 👔 Professional (Formal)\n4️⃣ 🧙‍♂️ Wizard (Mystical)\n\nReply with the number (1-4)."
+            msg = "🧠 [Step 6/6] **The Final Touch!**\n\nHow should I act around you? Choose my **Personality**:\n\n"
+            msg += "1️⃣ 🤗 **Best Friend** (Always here for you)\n"
+            msg += "2️⃣ 🔥 **Roast Master** (Fast & Sarcastic)\n"
+            msg += "3️⃣ 👔 **Professional** (Efficient & Polished)\n"
+            msg += "4️⃣ 🧙‍♂️ **Mystical Wizard** (Wise & Enigmatic)\n\n"
+            msg += "_Reply with **1, 2, 3, or 4** to breathe life into your AI._"
             return msg, None, False
 
         elif state == self.STATE_REG_PERSONA:
@@ -116,22 +124,8 @@ class ConversationManager:
                 platform, 
                 platform_id,
                 avatar_url=data.get('avatar_url'),
-                bio="New User"
+                bio="Member of the TrueFriend Community"
             )
-            
-            # Update system prompt after registration (we could have passed it to register_user but simpler to update here or update register_user signature again. 
-            # Ideally register_user should take it. But I didn't update register_user signature in DB step? 
-            # Wait, I did update the DB *schema* but did I update `register_user` python function? 
-            # I checked previous tool call: I updated `register_user` to take `avatar_url` and `bio`. 
-            # I did NOT update it to take `system_prompt`.
-            # So I should use `update_system_prompt` here.
-            
-            # Need to get user_id not returned by register_user directly (it returns msg).
-            # But register_user returns (success, msg). 
-            # We can use update_system_prompt if we can get the ID.
-            # OR we can update register_user again.
-            # Let's use `update_system_prompt` but we need `user_id`. `register_user` doesn't return `user_id`.
-            # We can get user by platform_id immediately.
             
             from app.core.database import get_user_by_platform, set_user_personalization
             user = get_user_by_platform(platform, platform_id)
@@ -141,18 +135,25 @@ class ConversationManager:
             
             clear_state(platform_id)
             
-            onboarding_msg = msg + "\n\n🎉 **Setup Complete!**\n\n"
-            onboarding_msg += "💡 **Quick Tips**:\n"
-            onboarding_msg += "• Type `/help` for a full list of commands 🌟\n"
-            onboarding_msg += "• Type `/mood` to change my tone of voice ✨\n"
-            onboarding_msg += "• You can always change genders with `/gender <me> <ai>` 👤\n\n"
-            onboarding_msg += "How are you feeling today?"
+            onboarding_msg = "🎊 *Welcome to the Family!* 🎊\n\n"
+            onboarding_msg += f"Your account for **{data['username']}** is officially active. I've set up your profile and personality just the way you like it.\n\n"
+            onboarding_msg += "💡 **How to make the most of TrueFriend:**\n"
+            onboarding_msg += "• Type `/help` to explore all my secret powers 🌟\n"
+            onboarding_msg += "• Use `/mood` to change how I talk to you anytime ✨\n"
+            onboarding_msg += "• `/friends` is where your squad lives! Add someone with `/add_friend` 👥\n\n"
+            onboarding_msg += "_I'm so excited to start this journey with you. What's on your mind?_"
             
             return onboarding_msg, None, True
 
         return None, None, False
 
     def start_registration(self, platform_id, platform):
-        """Start the registration flow."""
+        """Start the registration flow with a premium welcome."""
         set_state(platform_id, platform, self.STATE_REG_USERNAME, {})
-        return "👋 **Welcome to TrueFriend!** Let's get you set up.\n\nFirst, choose a unique **Username**:"
+        welcome = (
+            "🚀 **Welcome to TrueFriend AI**\n\n"
+            "I'm about to become your favorite companion, but first, I need a few details to build your unique profile.\n\n"
+            "✨ [Step 1/6] Let's begin!\n"
+            "**Choose a unique Username:**"
+        )
+        return welcome

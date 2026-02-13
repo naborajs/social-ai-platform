@@ -23,7 +23,7 @@ if not ENCRYPTION_KEY:
 class SecurityManager:
     def __init__(self):
         # Ensure we have a valid 32-byte base64 encoded key
-        key = os.getenv("ENCRYPTION_KEY", "uE9H5e5_z4S9u_S8v_R7u_Q6t_P5s_O4r_N3q_M2p_L1o=")
+        key = os.getenv("ENCRYPTION_KEY", "gO4kiXJcj-ZuT-HU9PCjprQ1IWVAce1-w796WEnoqKc=")
         self.fernet = Fernet(key.encode() if isinstance(key, str) else key)
 
     def encrypt(self, data: str) -> str:

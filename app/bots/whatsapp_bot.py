@@ -27,32 +27,38 @@ def run_whatsapp_bot(queues, login_info=None):
     # ... (rest of the listeners and events) ...
 
     def queue_listener():
-        """Thread to listen for cross-platform messages destined for WhatsApp."""
+        """Robust thread to listen for cross-platform messages destined for WhatsApp."""
         if not queues or "whatsapp" not in queues:
             return
         
         wa_queue = queues["whatsapp"]
+        print("📲 WhatsApp IPC Listener [ACTIVE]")
+        
         while True:
             try:
                 # Get message from our specific queue
                 item = wa_queue.get()
+                if not item: continue
+                
                 target = item.get("target")
-                text = item.get("text")
+                text = item.get("text", "")
                 image_path = item.get("image_path")
                 
-                if target and text:
-                    print(f"📥 IPC -> WhatsApp: Sending to {target}")
+                if target:
                     if image_path and os.path.exists(image_path):
-                        # Neonize usually supports send_image or similar
                         try:
                             client.send_image(target, image_path, caption=text)
-                        except AttributeError:
-                            # Fallback if send_image is not available in this neonize version
-                            client.send_message(target, f"{text}\n(Image path: {image_path})")
-                    else:
+                            print(f"🖼️ IPC -> WhatsApp: Sent Image to {target}")
+                        except Exception as e:
+                            # Fallback if send_image fails/not available
+                            client.send_message(target, f"{text}\n\n📎 [Attachment]: {image_path}")
+                            print(f"📥 IPC -> WhatsApp: Sent Message (Image Fallback) to {target}: {e}")
+                    elif text:
                         client.send_message(target, text)
+                        print(f"💬 IPC -> WhatsApp: Sent Message to {target}")
+                        
             except Exception as e:
-                print(f"❌ WhatsApp Queue Listener Error: {e}")
+                print(f"⚠️ WhatsApp IPC Listener Warning: {e}")
                 time.sleep(2)
 
     # Start Queue Listener Thread
