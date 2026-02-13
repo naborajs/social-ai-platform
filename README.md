@@ -10,8 +10,9 @@
 
 An intelligent, production-ready AI social platform that brings personalized chatbot experiences to WhatsApp and Telegram. Each user gets a unique identity with customizable AI personalities, making conversations feel truly human.
 ## 🔄 Recent Updates
-- **Version**: v3.7 Gold (Major Feature Upgrade)
+- **Version**: v3.8 Platinum (Social & Settings Upgrade)
 - **Status**: Stable / Production Ready
+- **v3.8 Platinum**: Interactive Settings, Usage Dashboard, & Smart Social Tools 💎
 - **v3.7 Gold**: Premium Onboarding, Advanced AI Personas, & Centralized Error Handling 🏆
 - **v3.7**: Fixed `NameError` in `main.py` and improved process monitoring 🛠️
 - **v3.4**: WhatsApp Pairing Code (OTP) Activation 🔑
@@ -28,6 +29,7 @@ An intelligent, production-ready AI social platform that brings personalized cha
 - [Technical Architecture](app/docs/system_architecture.md)
 - [Documentation Wiki](https://github.com/naborajs/social-ai-platform/wiki)
 - [Report a Bug](https://github.com/naborajs/social-ai-platform/issues)
+- [v3.8 Platinum Feature List](#-v38-platinum-features)
 
 ## 🌟 Key Features
 
@@ -57,10 +59,15 @@ No complex commands! Registration is conversational:
 - ✅ Telegram (via python-telegram-bot)
 - 📱 Unified backend for both platforms
 
-### 👥 **Social Features**
+### 👥 **Social & Discovery**
 - **Friend System**: `/add_friend`, `/friends`, `/accept`
-- **Group Chats**: `/create_group`, `/join`
-- **Unified Profiles**: Cross-platform identity synchronization
+- **Discovery**: `/search <query>` - Find and discover new people
+- **Profiles**: `/info <username>` - Mutual friends & bio view
+- **Unified Identity**: Cross-platform identity synchronization
+
+### 📊 **Transparency & Control**
+- **Settings Menu**: `/settings` (Alias: `/s`) - Full control over AI & Notifications
+- **Usage Stats**: `/usage` (Alias: `/u`) - Detailed interaction report card
 
 ### 🎨 **Social-Ready Features**
 - Unique user profiles with avatars

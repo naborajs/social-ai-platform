@@ -106,28 +106,23 @@ class UnifiedBot:
             elif command == "/help":
                 help_text = (
                     "✨ *TrueFriend AI Experience* ✨\n"
-                    "_Your premium AI companion across all platforms._\n\n"
-                    "🆕 *Account Management*\n"
-                    "• `/register` - Start your unique journey\n"
-                    "• `/login <user> <pass>` - Access your profile\n"
-                    "• `/otp_login <user>` - Ultra-secure WhatsApp entry\n"
-                    "• `/verify <otp>` - Complete your login\n\n"
-                    "💬 *Social & Interaction*\n"
-                    "• `/msg <user> <text>` - Send a cross-platform private message\n"
-                    "• `/chat <user>` - Instant tunnel (Bypass AI for direct chat)\n"
-                    "• `/exit` - Reactivate your AI friend\n"
-                    "• `/add_friend <user>` - Expand your squad\n"
-                    "• `/friends` - See who's online\n\n"
-                    "🎨 *Identity & Mood*\n"
-                    "• `/mood <mood>` - Switch AI tone (e.g., sarcastic, romantic)\n"
-                    "• `/gender <me> <ai>` - Adjust gender preferences\n"
-                    "• `/qr <text>` - Standard QR generator\n"
-                    "• `/secure_qr <text>` - Military-grade encrypted QR\n\n"
+                    "_Premium AI Social Platform v3.8 Gold_\n\n"
+                    "🆕 *Quick Controls* (Aliases: `/s`, `/u`, `/f`)\n"
+                    "• `/settings` - Deep customization menu\n"
+                    "• `/usage` - Your activity report card\n"
+                    "• `/search <name>` - Discover new people\n"
+                    "• `/info <user>` - View profile & mutuals\n\n"
+                    "💬 *Social Interaction*\n"
+                    "• `/msg <user> <text>` - Direct message\n"
+                    "• `/chat <user>` - Enter direct tunnel\n"
+                    "• `/exit` - Back to AI Friend mode\n"
+                    "• `/add_friend <user>` - Send request\n"
+                    "• `/friends` - View your squad\n\n"
                     "ℹ️ *System*\n"
                     "• `/help` - Show this menu\n"
-                    "• `/about` - Meet the creator\n"
-                    "• `/report <msg>` - Log feedback for the owner\n\n"
-                    "💡 _Simply type to start a conversation anytime._"
+                    "• `/about` - Project information\n"
+                    "• `/report <msg>` - Send feedback\n\n"
+                    "💡 _Chat naturally to interact with your AI companion._"
                 )
                 return help_text
     
@@ -241,8 +236,22 @@ class UnifiedBot:
             if command == "/add_friend":
                 if len(message_parts) < 2:
                     return "❌ Usage: `/add_friend <username>`"
-                from app.core.database import send_friend_request
-                success, msg = send_friend_request(user_id, message_parts[1])
+                target_user = message_parts[1]
+                from app.core.database import send_friend_request, get_user_contact_info
+                success, msg = send_friend_request(user_id, target_user)
+                
+                if success:
+                    # Notify the target user proactively
+                    target_info = get_user_contact_info(target_user)
+                    if target_info:
+                        pref = target_info['preferred_platform']
+                        t_id = target_info['whatsapp_id'] if pref == 'whatsapp' else target_info['telegram_id']
+                        if t_id and self.queues and pref in self.queues:
+                            self.queues[pref].put({
+                                "platform": pref,
+                                "target": t_id,
+                                "text": f"👋 **New Friend Request** from {username}!\nUse `/accept {username}` to join squads."
+                            })
                 return msg
     
             if command == "/friends":
@@ -253,8 +262,21 @@ class UnifiedBot:
             if command == "/accept":
                 if len(message_parts) < 2:
                     return "❌ Usage: `/accept <username>`"
-                from app.core.database import accept_friend_request
-                success, msg = accept_friend_request(user_id, message_parts[1])
+                target_user = message_parts[1]
+                from app.core.database import accept_friend_request, get_user_contact_info
+                success, msg = accept_friend_request(user_id, target_user)
+                if success:
+                    # Notify the person who sent the request
+                    target_info = get_user_contact_info(target_user)
+                    if target_info:
+                        pref = target_info['preferred_platform']
+                        t_id = target_info['whatsapp_id'] if pref == 'whatsapp' else target_info['telegram_id']
+                        if t_id and self.queues and pref in self.queues:
+                            self.queues[pref].put({
+                                "platform": pref,
+                                "target": t_id,
+                                "text": f"🎉 **{username} accepted your friend request!**\nYou can now message them with `/msg {username}`."
+                            })
                 return msg
     
             if command == "/mood":
@@ -277,6 +299,22 @@ class UnifiedBot:
                 set_user_personalization(user_id, gender=me_gender, ai_gender=ai_gen)
                 return f"👤 Preferences updated: You are **{me_gender}**, I am **{ai_gen}**."
     
+            if command in ["/settings", "/s"]:
+                return self._handle_settings(user_id, message_parts)
+
+            if command in ["/usage", "/u"]:
+                return self._handle_usage(user_id, username)
+
+            if command == "/search":
+                if len(message_parts) < 2:
+                    return "❌ Usage: `/search <query>`"
+                return self._handle_search(" ".join(message_parts[1:]))
+
+            if command == "/info":
+                if len(message_parts) < 2:
+                    return "❌ Usage: `/info <username>`"
+                return self._handle_info(user_id, message_parts[1])
+
             if command == "/report":
                 if len(message_parts) < 2:
                     return "📝 **Report an Issue**:\nUsage: `/report <describe the problem>`"
@@ -398,3 +436,120 @@ class UnifiedBot:
             return f"📤 Message sent to {to_username}!"
         
         return "❌ Messaging system temporarily unavailable."
+
+    def _handle_settings(self, user_id, parts):
+        """Handle the /settings menu and its sub-commands."""
+        from app.core.database import get_user_personalization, set_user_personalization, set_preferred_platform, get_user_by_id
+        
+        if len(parts) < 2:
+            pers = get_user_personalization(user_id)
+            u_info = get_user_by_id(user_id)
+            pref = u_info.get('preferred_platform', 'whatsapp').upper()
+            
+            return (
+                "⚙️ **TrueFriend Settings Menu**\n"
+                "------------------------------\n"
+                f"🧠 **AI Mood**: {pers['mood'].title()}\n"
+                f"👤 **Your Gender**: {pers['gender'] or 'Not Set'}\n"
+                f"🤖 **AI Gender**: {pers['ai_gender'] or 'Not Set'}\n"
+                f"📲 **Notifications**: {pref}\n\n"
+                "**Quick Commands**:\n"
+                "• `/s mood <mood>` (supportive, sarcastic, etc.)\n"
+                "• `/s gender <me> <ai>` (e.g., he she)\n"
+                "• `/s notify <wa|tg>` (Change platform)\n"
+                "• `/s api <key>` (Set Gemini Key)"
+            )
+        
+        sub = parts[1].lower()
+        if sub == "mood" and len(parts) > 2:
+            mood = parts[2].lower()
+            moods = ["supportive", "romantic", "sarcastic", "cheerful", "calm"]
+            if mood in moods:
+                set_user_personalization(user_id, mood=mood)
+                return f"✅ Mood set to **{mood.title()}**."
+            return f"❌ Invalid mood. Choices: {', '.join(moods)}"
+            
+        elif sub == "notify" and len(parts) > 2:
+            plat = "whatsapp" if parts[2].lower() in ["wa", "whatsapp"] else "telegram"
+            set_preferred_platform(user_id, plat)
+            return f"✅ Notifications moved to **{plat.title()}**."
+            
+        elif sub == "api" and len(parts) > 2:
+            key = parts[2]
+            from app.core.database import set_api_key
+            set_api_key(user_id, key)
+            return "✅ API Key updated securely."
+            
+        return "❌ Invalid settings command. Use `/s` to see the menu."
+
+    def _handle_usage(self, user_id, username):
+        """Show usage statistics and account level."""
+        import sqlite3
+        from app.core.config import DB_NAME
+        conn = sqlite3.connect(DB_NAME)
+        c = conn.cursor()
+        
+        # Count messages
+        c.execute("SELECT COUNT(*) FROM conversations WHERE user_id = ?", (user_id,))
+        count = c.fetchone()[0]
+        
+        # Most messaged friend
+        c.execute('''SELECT users.username, COUNT(*) as c FROM private_messages 
+                     JOIN users ON private_messages.to_id = users.id
+                     WHERE private_messages.from_id = ? 
+                     GROUP BY users.id ORDER BY c DESC LIMIT 1''', (user_id,))
+        best_friend = c.fetchone()
+        bf_name = best_friend[0] if best_friend else "None"
+        
+        conn.close()
+        
+        level = (count // 50) + 1
+        return (
+            f"📊 **TrueFriend Report: {username}**\n"
+            "------------------------------\n"
+            f"📈 **Interactons**: {count} messages\n"
+            f"🏆 **Level**: {level} (AI Companion)\n"
+            f"💖 **Best Friend**: {bf_name}\n"
+            "✨ _Keep chatting to level up!_"
+        )
+
+    def _handle_info(self, viewer_id, target_username):
+        """Show profile card for a user with mutual friend count."""
+        from app.core.database import get_user_by_username, get_mutual_friends_count
+        
+        import sqlite3
+        from app.core.config import DB_NAME
+        conn = sqlite3.connect(DB_NAME)
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+        c.execute("SELECT id, username, bio, avatar_url, last_seen FROM users WHERE username = ?", (target_username,))
+        row = c.fetchone()
+        conn.close()
+        
+        if not row:
+            return "❌ User not found."
+            
+        mutuals = get_mutual_friends_count(viewer_id, row['id'])
+        
+        return (
+            f"👤 **Profile: {row['username']}**\n"
+            f"📝 **Bio**: {row['bio'] or 'No bio set.'}\n"
+            f"🎭 **Avatar**: {row['avatar_url'] or 'Default'}\n"
+            f"🤝 **Mutuals**: {mutuals} friends\n"
+            f"🕒 **Last Seen**: {row['last_seen']}"
+        )
+
+    def _handle_search(self, query):
+        """Search for users and present findings."""
+        from app.core.database import search_users
+        results = search_users(query)
+        
+        if not results:
+            return f"🔍 No users found matching '*{query}*'."
+            
+        text = f"🔍 **Search Results for '{query}'**:\n"
+        for r in results:
+            text += f"• **{r['username']}** - {r['bio'][:40] if r['bio'] else 'No bio'}\n"
+        
+        text += "\n💡 Type `/info <username>` to view their full profile!"
+        return text

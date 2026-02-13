@@ -606,3 +606,31 @@ def remove_friend(user_id, friend_username):
         return True, f"Friendship with {friend_username} removed."
     conn.close()
     return False, "Friend not found."
+def search_users(query, limit=10):
+    """Search for users by username or display name."""
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    search_query = f"%{query}%"
+    c.execute("SELECT username, display_name, bio FROM users WHERE username LIKE ? OR display_name LIKE ? LIMIT ?", 
+              (search_query, search_query, limit))
+    results = [dict(r) for r in c.fetchall()]
+    conn.close()
+    return results
+
+def get_mutual_friends_count(user1_id, user2_id):
+    """Calculate the number of mutual friends between two users."""
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute('''SELECT COUNT(*) FROM (
+                    SELECT user2_id as friend_id FROM friends WHERE user1_id = ? AND status = 'accepted'
+                    UNION SELECT user1_id FROM friends WHERE user2_id = ? AND status = 'accepted'
+                 ) AS u1
+                 INTERSECT
+                 SELECT friend_id FROM (
+                    SELECT user2_id as friend_id FROM friends WHERE user1_id = ? AND status = 'accepted'
+                    UNION SELECT user1_id FROM friends WHERE user2_id = ? AND status = 'accepted'
+                 ) AS u2''', (user1_id, user1_id, user2_id, user2_id))
+    count = c.fetchone()[0]
+    conn.close()
+    return count
