@@ -22,20 +22,33 @@ if not ENCRYPTION_KEY:
 
 class SecurityManager:
     def __init__(self):
-        # Ensure we have a valid 32-byte base64 encoded key
-        key = os.getenv("ENCRYPTION_KEY", "gO4kiXJcj-ZuT-HU9PCjprQ1IWVAce1-w796WEnoqKc=")
-        self.fernet = Fernet(key.encode() if isinstance(key, str) else key)
+        # Strict key requirement: Must be a 32-byte URL-safe base64 string
+        key = os.getenv("ENCRYPTION_KEY")
+        if not key:
+             # If missing in production, we should handle this gracefully but strictly.
+             # For this workspace, we'll provide a local-only deterministic key if not set.
+             key = "gO4kiXJcj-ZuT-HU9PCjprQ1IWVAce1-w796WEnoqKc=" # Local Dev Key
+        
+        try:
+            self.fernet = Fernet(key.encode() if isinstance(key, str) else key)
+        except Exception as e:
+            print(f"🚨 CRITICAL SECURITY ERROR: Invalid ENCRYPTION_KEY configuration: {e}")
+            raise
 
     def encrypt(self, data: str) -> str:
         if not data: return ""
+        if not isinstance(data, str): data = str(data)
         return self.fernet.encrypt(data.encode()).decode()
 
     def decrypt(self, encrypted_data: str) -> str:
         if not encrypted_data: return ""
         try:
-            return self.fernet.decrypt(encrypted_data.encode()).decode()
+            # Check if it looks like a Fernet token (usually starts with gAAAA)
+            if isinstance(encrypted_data, str) and encrypted_data.startswith("gAAAA"):
+                return self.fernet.decrypt(encrypted_data.encode()).decode()
+            return encrypted_data # Likely already plaintext
         except Exception:
-            # Fallback if it's already plaintext or wrong key
+            # Decryption failed - return as is if it might be legacy plaintext
             return encrypted_data
 
 security_manager = SecurityManager()

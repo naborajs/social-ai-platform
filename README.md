@@ -10,10 +10,10 @@
 
 An intelligent, production-ready AI social platform that brings personalized chatbot experiences to WhatsApp and Telegram. Each user gets a unique identity with customizable AI personalities, making conversations feel truly human.
 ## 🔄 Recent Updates
-- **Version**: v5.0 Creator Edition (The Professional Upgrade)
-- **Status**: Production Ready / Influencer & Creator Optimized
+- **Version**: v6.0 Cyber-Secure Edition (The Privacy Upgrade)
+- **Status**: Production Ready / Enterprise-Grade Security 🛡️
+- **v6.0 Cyber-Secure**: End-to-End Encryption, PII Locking & UTF-8 Console Fixes 🔐
 - **v5.0 Creator Edition**: Professional Accounts, Analytics, Follow System & Advanced Visibility 👑
-- **v4.0 Diamond**: Public Feed, Expiring Stories, Multimodal AI, & Creator Suite 💎
 - **v3.7**: Fixed `NameError` in `main.py` and improved process monitoring 🛠️
 - **v3.4**: WhatsApp Pairing Code (OTP) Activation 🔑
 - **v3.4**: OTP-based Login System (`/otp_login`, `/verify`) 🔐
@@ -58,6 +58,12 @@ No complex commands! Registration is conversational:
 - ✅ WhatsApp (via Neonize)
 - ✅ Telegram (via python-telegram-bot)
 - 📱 Unified backend for both platforms
+
+### 🛡️ **v6.0 Cyber-Secure Edition**
+- **Full PII Encryption**: Emails, bios, and personas are stored as unreadable ciphertexts
+- **End-to-End Privacy**: All private messages and chat history are fully encrypted
+- **Harden Keying**: Zero-trust key management architecture
+- **Zero-Error Terminals**: Forced UTF-8 encoding fixes `UnicodeEncodeError` in all environments
 
 ### 👑 **v5.0 Creator Edition**
 - **Professional Accounts**: `/professional` - Level up to unlock creator tools

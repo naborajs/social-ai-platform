@@ -229,10 +229,13 @@ def register_user(username, email, password, platform=None, platform_id=None, av
     recovery_key = secrets.token_hex(8)
     
     try:
-        # Direct bcrypt usage
-        hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        # PII Encryption (v6.0 Cyber-Secure)
+        enc_email = security_manager.encrypt(email)
+        enc_bio = security_manager.encrypt(bio) if bio else None
+        
+        enc_recovery = security_manager.encrypt(recovery_key)
         c.execute("INSERT INTO users (username, email, password_hash, recovery_key, avatar_url, bio) VALUES (?, ?, ?, ?, ?, ?)", 
-                  (username, email, hashed, recovery_key, avatar_url, bio))
+                  (username, enc_email, hashed, enc_recovery, avatar_url, enc_bio))
         user_id = c.lastrowid
         
         if platform == "whatsapp":
@@ -259,9 +262,10 @@ def update_system_prompt(user_id, system_prompt):
     conn.execute("PRAGMA journal_mode=WAL;")
     c = conn.cursor()
     try:
-        c.execute("UPDATE users SET system_prompt = ? WHERE id = ?", (system_prompt, user_id))
+        enc_prompt = security_manager.encrypt(system_prompt)
+        c.execute("UPDATE users SET system_prompt = ? WHERE id = ?", (enc_prompt, user_id))
         conn.commit()
-        return True, "Persona updated successfully!"
+        return True, "✅ Persona updated successfully!"
     except Exception as e:
         return False, f"Error updating persona: {e}"
     finally:
@@ -274,36 +278,43 @@ def get_user_system_prompt(user_id):
     c.execute("SELECT system_prompt FROM users WHERE id = ?", (user_id,))
     result = c.fetchone()
     conn.close()
-    return result[0] if result else None
+    if result and result[0]:
+        return security_manager.decrypt(result[0])
+    return None
 
 # Updated get_user_by_platform to return system_prompt
 def get_user_by_platform(platform, platform_id):
+    """Retrieve user with decrypted API key and system prompt."""
     conn = sqlite3.connect(DB_NAME)
     conn.execute("PRAGMA journal_mode=WAL;")
     c = conn.cursor()
     if platform == "whatsapp":
-        c.execute("SELECT id, username, gemini_api_key, system_prompt FROM users WHERE whatsapp_id = ?", (platform_id,))
+        c.execute("SELECT id, username, gemini_api_key, system_prompt, is_verified, level FROM users WHERE whatsapp_id = ?", (platform_id,))
     elif platform == "telegram":
-        c.execute("SELECT id, username, gemini_api_key, system_prompt FROM users WHERE telegram_id = ?", (platform_id,))
+        c.execute("SELECT id, username, gemini_api_key, system_prompt, is_verified, level FROM users WHERE telegram_id = ?", (platform_id,))
     user = c.fetchone()
     conn.close()
     if user:
-        # Decrypt API Key
         u_list = list(user)
-        u_list[2] = security_manager.decrypt(u_list[2])
+        u_list[2] = security_manager.decrypt(u_list[2]) # Gemini Key
+        u_list[3] = security_manager.decrypt(u_list[3]) # System Prompt
         return tuple(u_list)
-    return user # Returns (id, username, gemini_api_key, system_prompt)
+    return user
 
 def get_user_by_username(username):
-    """Retrieve user info by username."""
+    """Retrieve user info by username (Decrypted PII)."""
     conn = sqlite3.connect(DB_NAME)
-    conn.execute("PRAGMA journal_mode=WAL;")
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
-    c.execute("SELECT id, username, whatsapp_id, telegram_id, preferred_platform FROM users WHERE username = ?", (username,))
+    c.execute("SELECT id, username, display_name, bio, avatar_url, last_seen, is_verified, level, whatsapp_id, telegram_id, preferred_platform FROM users WHERE username = ?", (username,))
     user = c.fetchone()
     conn.close()
-    return dict(user) if user else None
+    if user:
+        u_dict = dict(user)
+        u_dict['bio'] = security_manager.decrypt(u_dict.get('bio'))
+        u_dict['display_name'] = security_manager.decrypt(u_dict.get('display_name'))
+        return u_dict
+    return None
 
 def verify_user(username, password):
     conn = sqlite3.connect(DB_NAME)
@@ -360,18 +371,24 @@ def change_username(user_id, new_username):
         conn.close()
 
 def recover_account(recovery_key, new_password):
-    """Recover account using recovery key and set new password."""
+    """Recover account using encrypted recovery key."""
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
-    c.execute("SELECT id FROM users WHERE recovery_key = ?", (recovery_key,))
-    user = c.fetchone()
-    if user:
-        user_id = user[0]
-        hashed = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-        c.execute("UPDATE users SET password_hash = ? WHERE id = ?", (hashed, user_id))
-        conn.commit()
-        conn.close()
-        return True, "✅ Account recovered and password updated successfully!"
+    # We need to find the user by their decrypted recovery key.
+    # Since we can't search encrypted fields efficiently, we iterate or use a deterministic hash (Omitted for simplicity, we'll try to match exact ciphertext if it's deterministic which it isn't with Fernet).
+    # Correct way: fetch all and decrypt, or use a separate hash for lookup.
+    # For now, we'll fetch all recovery keys and match.
+    c.execute("SELECT id, recovery_key FROM users")
+    users = c.fetchall()
+    
+    for u_id, enc_key in users:
+        if security_manager.decrypt(enc_key) == recovery_key:
+            hashed = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+            c.execute("UPDATE users SET password_hash = ? WHERE id = ?", (hashed, u_id))
+            conn.commit()
+            conn.close()
+            return True, "✅ Account recovered and password updated successfully!"
+    
     conn.close()
     return False, "❌ Invalid recovery key."
 
@@ -406,19 +423,22 @@ def get_user_by_id(user_id):
     conn.execute("PRAGMA journal_mode=WAL;")
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
-    c.execute("SELECT id, username, whatsapp_id, telegram_id, preferred_platform FROM users WHERE id = ?", (user_id,))
+    c.execute("SELECT id, username, whatsapp_id, telegram_id, preferred_platform, is_verified, level FROM users WHERE id = ?", (user_id,))
     user = c.fetchone()
     conn.close()
     return dict(user) if user else None
 
 
 def log_conversation(user_id, message, response):
-     conn = sqlite3.connect(DB_NAME)
-     conn.execute("PRAGMA journal_mode=WAL;")
-     c = conn.cursor()
-     c.execute("INSERT INTO conversations (user_id, message, response) VALUES (?, ?, ?)", (user_id, message, response))
-     conn.commit()
-     conn.close()
+    """Log a conversation with encrypted content."""
+    conn = sqlite3.connect(DB_NAME)
+    conn.execute("PRAGMA journal_mode=WAL;")
+    c = conn.cursor()
+    enc_msg = security_manager.encrypt(message)
+    enc_res = security_manager.encrypt(response)
+    c.execute("INSERT INTO conversations (user_id, message, response) VALUES (?, ?, ?)", (user_id, enc_msg, enc_res))
+    conn.commit()
+    conn.close()
 
 # --- State Management Functions ---
 def set_state(platform_id, platform, state, data=None):
@@ -580,7 +600,7 @@ def submit_report(user_id, report_type, description):
     conn.close()
 
 def get_chat_history(user_id, limit=15):
-    """Retrieve recent conversation history for cross-platform memory."""
+    """Retrieve and decrypt recent conversation history."""
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
     c.execute('''SELECT message, response FROM conversations 
@@ -588,8 +608,15 @@ def get_chat_history(user_id, limit=15):
                  ORDER BY timestamp DESC LIMIT ?''', (user_id, limit))
     history = c.fetchall()
     conn.close()
-    # Return in chronological order
-    return history[::-1]
+    
+    decrypted_history = []
+    for msg, res in history:
+        decrypted_history.append((
+            security_manager.decrypt(msg),
+            security_manager.decrypt(res)
+        ))
+    
+    return decrypted_history[::-1]
 
 # Initialize on import
 init_db()
@@ -709,6 +736,41 @@ def create_story(user_id, content, image_url=None, hours=24):
     conn.commit()
     conn.close()
     return True
+
+def send_private_message(from_id, to_username, content):
+    """Send an encrypted private message."""
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("SELECT id, preferred_platform, whatsapp_id, telegram_id FROM users WHERE username = ?", (to_username,))
+    to_user = c.fetchone()
+    if to_user:
+        to_id = to_user[0]
+        enc_content = security_manager.encrypt(content)
+        c.execute("INSERT INTO private_messages (from_id, to_id, content) VALUES (?, ?, ?)", (from_id, to_id, enc_content))
+        conn.commit()
+        conn.close()
+        return True, to_user
+    conn.close()
+    return False, None
+
+def get_private_messages(user_id, limit=20):
+    """Fetch and decrypt recent private messages."""
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute('''SELECT pm.*, users.username as from_username FROM private_messages pm
+                 JOIN users ON pm.from_id = users.id
+                 WHERE pm.to_id = ? 
+                 ORDER BY pm.timestamp DESC LIMIT ?''', (user_id, limit))
+    rows = c.fetchall()
+    conn.close()
+    
+    messages = []
+    for row in rows:
+        d = dict(row)
+        d['content'] = security_manager.decrypt(d['content'])
+        messages.append(d)
+    return messages
 
 def get_social_feed(limit=20):
     """Fetch global public feed with usernames."""

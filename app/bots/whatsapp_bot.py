@@ -113,23 +113,27 @@ def run_whatsapp_bot(queues, login_info=None):
             sender = chat_info.RemoteJid
 
             # Handle Media
+            media_path = None
             if original_msg.imageMessage:
-                client.send_message(sender, "🤖 Image received!")
-                return
-            if original_msg.videoMessage:
-                 client.send_message(sender, "🤖 Video received!")
-                 return
-
-            # Extract text content
-            text = original_msg.conversation or original_msg.extendedTextMessage.text
+                try:
+                    # Download media (assuming neonize download methods)
+                    media_path = client.download_any(original_msg.imageMessage)
+                    print(f"🖼️ Image downloaded: {media_path}")
+                except Exception as e:
+                    print(f"⚠️ Media download failed: {e}")
             
-            if not text:
+            # Extract text content
+            text = (original_msg.conversation or 
+                   (original_msg.extendedTextMessage.text if original_msg.extendedTextMessage else "") or
+                   (original_msg.imageMessage.caption if original_msg.imageMessage else ""))
+            
+            if not text and not media_path:
                 return
 
-            print(f"📩 Message from {sender}: {text}")
+            print(f"📩 Message from {sender}: {text or '[Image]'}")
 
             # Process message via UnifiedBot
-            response_text = bot_core.handle_message(text, "whatsapp", sender)
+            response_text = bot_core.handle_message(text, "whatsapp", sender, media_path=media_path)
             
             if response_text:
                 print(f"📤 Replying: {response_text}")

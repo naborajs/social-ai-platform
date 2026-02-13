@@ -230,21 +230,24 @@ class ChatBot:
             self.error_count += 1
             return "❌ Error processing math: Something unexpected happened!"
     
-    def generate_response(self, user_input: str, user_api_key: Optional[str] = None, system_instruction: Optional[str] = None, history: list = None) -> str:
+    def generate_response(self, user_input: str, user_api_key: Optional[str] = None, 
+                          system_instruction: Optional[str] = None, history: list = None,
+                          media_path: Optional[str] = None) -> str:
         """Generate an appropriate response based on user input."""
         try:
-            if not user_input:
-                return "❌ Please say something! I'm listening... 👂"
+            if not user_input and not media_path:
+                return "❌ Please say something or send an image! I'm listening... 👂"
             
             # Check for specific commands first
-            if user_input.lower() == "time":
+            if user_input and user_input.lower() == "time":
                  return f"The current time is {self.get_current_time()}! ⏰"
 
             # Use Gemini for all other responses
             if self.llm_handler:
                 return self.llm_handler.generate_response(user_input, user_api_key=user_api_key, 
                                                          system_instruction=system_instruction,
-                                                         history=history)
+                                                         history=history,
+                                                         image_path=media_path)
             
             # Fallback if LLM is not available
             intent, confidence = self.extract_intent(user_input)

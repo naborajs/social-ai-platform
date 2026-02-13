@@ -12,11 +12,11 @@ class UnifiedBot:
         self.chatbot = ChatBot()
         # Premium Identity
         self.chatbot.name = "TrueFriend"
-        self.chatbot.version = "3.7" # Stability & Premium Upgrade
+        self.chatbot.version = "6.0" # Cyber-Secure Edition Upgrade
         self.conv_manager = ConversationManager()
         self.queues = queues # Dict of {platform: queue}
         
-    def handle_message(self, message, platform, platform_id):
+    def handle_message(self, message, platform, platform_id, media_path=None):
         try:
             # 1. Check Active Conversation State First (Registration/Onboarding)
             response, options, is_complete = self.conv_manager.handle_input(platform_id, platform, message)
@@ -105,8 +105,8 @@ class UnifiedBot:
     
             elif command == "/help":
                 help_text = (
-                    "👑 *TrueFriend Creator Edition v5.0* 👑\n"
-                    "_The Professional AI Social Network_\n\n"
+                    "🛡️ *TrueFriend Cyber-Secure Edition v6.0* 🛡️\n"
+                    "_End-to-End Encrypted Professional Network_\n\n"
                     "📊 *Creator Dashboard*\n"
                     "• `/stats` - View your reach & growth\n"
                     "• `/professional` - Level up to Creator status\n"
@@ -135,7 +135,7 @@ class UnifiedBot:
                     "• 🐦 *X/Twitter*: [@NSGAMMING699](https://twitter.com/NSGAMMING699)\n"
                     "• 💻 *GitHub*: [naborajs](https://github.com/naborajs)\n"
                     "• 💬 *Telegram*: [@Nishantsarkar10k](https://t.me/Nishantsarkar10k)\n\n"
-                    "🛡️ *Version*: v3.7 Gold - Stability, Performance, & Privacy."
+                    "🛡️ *Version*: v6.0 Cyber-Secure - Stability, Performance, & Privacy."
                 )
                 return about_text
     
@@ -416,7 +416,8 @@ class UnifiedBot:
             self.chatbot.user_name = username
             response = self.chatbot.generate_response(message, user_api_key=user_api_key, 
                                                      system_instruction=dynamic_prompt,
-                                                     history=history)
+                                                     history=history,
+                                                     media_path=media_path)
             from app.core.database import log_conversation
             log_conversation(user_id, message, response)
             

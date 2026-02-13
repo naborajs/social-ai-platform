@@ -2,6 +2,7 @@ import multiprocessing
 import time
 import sys
 import os
+import io
 from dotenv import load_dotenv
 from colorama import init, Fore, Style
 

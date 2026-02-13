@@ -85,7 +85,7 @@ class ConversationManager:
                 
             data['email'] = text
             set_state(platform_id, platform, self.STATE_REG_PASSWORD, data)
-            return "🔐 [Step 3/6] **Let's keep it secure!**\n\nCreate a **Strong Password**:\n\n_Tip: Use a mix of letters and numbers for maximum safety._", None, False
+            return "🔐 [Step 4/7] **Let's keep it secure!**\n\nCreate a **Strong Password**:\n\n_Tip: Use a mix of letters and numbers for maximum safety._", None, False
 
         elif state == self.STATE_REG_PASSWORD:
             if len(text) < 6:
@@ -93,7 +93,7 @@ class ConversationManager:
                 
             data['password'] = text
             set_state(platform_id, platform, self.STATE_REG_GENDER, data)
-            return "👤 [Step 4/6] **Tell me about yourself.**\n\nWhat is your **Gender**? (he/she)\n\n_I'll use this to tailor my tone and how I address you!_", None, False
+            return "👤 [Step 5/7] **Tell me about yourself.**\n\nWhat is your **Gender**? (he/she)\n\n_I'll use this to tailor my tone and how I address you!_", None, False
 
         elif state == self.STATE_REG_GENDER:
             gender = "she" if "she" in text.lower() else "he"
@@ -104,7 +104,7 @@ class ConversationManager:
             set_state(platform_id, platform, self.STATE_REG_AVATAR, data)
             
             # Show Avatar Options
-            msg = "🎨 [Step 5/6] **Let's pick an Identity!**\n\nChoose your **Avatar**:\n\n"
+            msg = "🎨 [Step 6/7] **Let's pick an Identity!**\n\nChoose your **Avatar**:\n\n"
             msg += "1️⃣ **Adventurer Felix** (Bold & Dynamic)\n"
             msg += "2️⃣ **Adventurer Aneka** (Wise & Swift)\n"
             msg += "3️⃣ **Midnight Warrior** (Sleek & Mysterious)\n"
@@ -120,7 +120,7 @@ class ConversationManager:
             data['avatar_url'] = avatar_url
             set_state(platform_id, platform, self.STATE_REG_PERSONA, data)
             
-            msg = "🧠 [Step 6/6] **The Final Touch!**\n\nHow should I act around you? Choose my **Personality**:\n\n"
+            msg = "🧠 [Step 7/7] **The Final Touch!**\n\nHow should I act around you? Choose my **Personality**:\n\n"
             msg += "1️⃣ 🤗 **Best Friend** (Always here for you)\n"
             msg += "2️⃣ 🔥 **Roast Master** (Fast & Sarcastic)\n"
             msg += "3️⃣ 👔 **Professional** (Efficient & Polished)\n"
@@ -147,6 +147,9 @@ class ConversationManager:
                 bio="Professional Content Creator" if data.get('is_professional') else "Member of the TrueFriend Community"
             )
             
+            if not success:
+                return f"❌ **Registration Failed**: {msg}\n\n_Please try again or contact support._", None, False
+
             from app.core.database import get_user_by_platform, set_user_personalization
             user = get_user_by_platform(platform, platform_id)
             if user:

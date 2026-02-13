@@ -86,10 +86,20 @@ def run_telegram_bot(queues):
 
     async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         sender_id = str(update.effective_user.id)
-        text = update.message.text
-        if not text: return
+        text = update.message.text or update.message.caption
+        media_path = None
 
-        response = bot_core.handle_message(text, "telegram", sender_id)
+        if update.message.photo:
+            # Get highest resolution photo
+            photo_file = await update.message.photo[-1].get_file()
+            os.makedirs("tmp", exist_ok=True)
+            media_path = os.path.join("tmp", f"tg_{photo_file.file_id}.jpg")
+            await photo_file.download_to_drive(media_path)
+            print(f"🖼️ Telegram Image Downloaded: {media_path}")
+
+        if not text and not media_path: return
+
+        response = bot_core.handle_message(text or "", "telegram", sender_id, media_path=media_path)
         
         if response:
             await context.bot.send_message(
