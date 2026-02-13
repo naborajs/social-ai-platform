@@ -138,6 +138,27 @@ def init_db():
                     FOREIGN KEY(user_id) REFERENCES users(id)
                 )''')
 
+    # Follows table (v5.0)
+    c.execute('''CREATE TABLE IF NOT EXISTS follows (
+                    follower_id INTEGER,
+                    followed_id INTEGER,
+                    receive_notifications INTEGER DEFAULT 1,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY(follower_id, followed_id),
+                    FOREIGN KEY(follower_id) REFERENCES users(id),
+                    FOREIGN KEY(followed_id) REFERENCES users(id)
+                )''')
+
+    # Post Analytics / Views table (v5.0)
+    c.execute('''CREATE TABLE IF NOT EXISTS post_views (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    post_id INTEGER,
+                    viewer_id INTEGER,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY(post_id) REFERENCES posts(id),
+                    FOREIGN KEY(viewer_id) REFERENCES users(id)
+                )''')
+
     # Reports table
     c.execute('''CREATE TABLE IF NOT EXISTS reports (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -165,12 +186,26 @@ def init_db():
         ("ai_gender", "TEXT"), # AI's preferred gender
         ("ai_mood", "TEXT DEFAULT 'supportive'"), # current AI mood
         ("is_verified", "INTEGER DEFAULT 0"), # v4.0 Diamond logic
-        ("level", "INTEGER DEFAULT 1")
+        ("level", "INTEGER DEFAULT 1"),
+        ("account_type", "TEXT DEFAULT 'personal'"), # v5.0 Creator Edition
+        ("is_professional", "INTEGER DEFAULT 0")
     ]
     
     for col_name, col_type in columns:
         try:
             c.execute(f"ALTER TABLE users ADD COLUMN {col_name} {col_type}")
+            conn.commit() # Commit each column add
+        except sqlite3.OperationalError:
+            pass # Column likely exists
+            
+    # Posts Table Migrations (v5.0)
+    post_columns = [
+        ("visibility", "TEXT DEFAULT 'public'"), # public/private/archive
+        ("post_type", "TEXT DEFAULT 'post'") # post/story
+    ]
+    for col_name, col_type in post_columns:
+        try:
+            c.execute(f"ALTER TABLE posts ADD COLUMN {col_name} {col_type}")
             conn.commit() # Commit each column add
         except sqlite3.OperationalError:
             pass # Column likely exists
@@ -652,15 +687,16 @@ def remove_friend(user_id, friend_username):
         return True, f"Friendship with {friend_username} removed."
     conn.close()
     return False, "Friend not found."
-def create_post(user_id, content, image_url=None, is_public=1):
-    """Create a new social post."""
+def create_post(user_id, content, image_url=None, visibility='public', post_type='post'):
+    """Create a new social post with visibility controls."""
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
-    c.execute("INSERT INTO posts (user_id, content, image_url, is_public) VALUES (?, ?, ?, ?)", 
-              (user_id, content, image_url, is_public))
+    c.execute("INSERT INTO posts (user_id, content, image_url, visibility, post_type) VALUES (?, ?, ?, ?, ?)", 
+              (user_id, content, image_url, visibility, post_type))
+    post_id = c.lastrowid
     conn.commit()
     conn.close()
-    return True
+    return post_id
 
 def create_story(user_id, content, image_url=None, hours=24):
     """Create an expiring story."""
@@ -681,7 +717,7 @@ def get_social_feed(limit=20):
     c = conn.cursor()
     c.execute('''SELECT posts.*, users.username, users.is_verified FROM posts 
                  JOIN users ON posts.user_id = users.id 
-                 WHERE posts.is_public = 1 
+                 WHERE posts.visibility = 'public' AND posts.post_type = 'post'
                  ORDER BY posts.timestamp DESC LIMIT ?''', (limit,))
     results = [dict(r) for r in c.fetchall()]
     conn.close()
@@ -766,3 +802,100 @@ def get_mutual_friends_count(user1_id, user2_id):
     count = c.fetchone()[0]
     conn.close()
     return count
+
+def follow_user(follower_id, followed_username):
+    """Follow a user by their username."""
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("SELECT id FROM users WHERE username = ?", (followed_username,))
+    followed = c.fetchone()
+    if not followed:
+        conn.close()
+        return False, "User not found."
+    
+    followed_id = followed[0]
+    if follower_id == followed_id:
+        conn.close()
+        return False, "You cannot follow yourself."
+        
+    try:
+        c.execute("INSERT INTO follows (follower_id, followed_id) VALUES (?, ?)", (follower_id, followed_id))
+        conn.commit()
+        res = True, f"You are now following {followed_username}!"
+    except sqlite3.IntegrityError:
+        res = False, f"You are already following {followed_username}."
+    
+    conn.close()
+    return res
+
+def unfollow_user(follower_id, followed_username):
+    """Unfollow a user."""
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("SELECT id FROM users WHERE username = ?", (followed_username,))
+    followed = c.fetchone()
+    if not followed:
+        conn.close()
+        return False, "User not found."
+    
+    c.execute("DELETE FROM follows WHERE follower_id = ? AND followed_id = ?", (follower_id, followed[0]))
+    conn.commit()
+    conn.close()
+    return True, f"Unfollowed {followed_username}."
+
+def get_follow_status(follower_id, followed_id):
+    """Check if a user follows another."""
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("SELECT receive_notifications FROM follows WHERE follower_id = ? AND followed_id = ?", (follower_id, followed_id))
+    res = c.fetchone()
+    conn.close()
+    return res if res else (None,)
+
+def set_professional_account(user_id, is_prof=1):
+    """Upgrade account to professional/creator status."""
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("UPDATE users SET is_professional = ?, account_type = ? WHERE id = ?", (is_prof, 'professional' if is_prof else 'personal', user_id))
+    conn.commit()
+    conn.close()
+
+def log_post_view(post_id, viewer_id):
+    """Log a view for analytics (Diamond/Creator feature)."""
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    # Check if already viewed to prevent duplicate counting in stats
+    c.execute("SELECT id FROM post_views WHERE post_id = ? AND viewer_id = ?", (post_id, viewer_id))
+    if not c.fetchone():
+        c.execute("INSERT INTO post_views (post_id, viewer_id) VALUES (?, ?)", (post_id, viewer_id))
+        conn.commit()
+    conn.close()
+
+def get_post_analytics(post_id):
+    """Retrieve detailed analytics for a post."""
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("SELECT COUNT(*) FROM post_views WHERE post_id = ?", (post_id,))
+    views = c.fetchone()[0]
+    c.execute("SELECT COUNT(*) FROM reactions WHERE post_id = ?", (post_id,))
+    likes = c.fetchone()[0]
+    conn.close()
+    return {"views": views, "likes": likes}
+
+def get_follower_ids(user_id):
+    """Get IDs of everyone following this user."""
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("SELECT follower_id FROM follows WHERE followed_id = ? AND receive_notifications = 1", (user_id,))
+    ids = [r[0] for r in c.fetchall()]
+    conn.close()
+    return ids
+
+def update_post_visibility(post_id, user_id, visibility):
+    """Update visibility of a post (Creator control)."""
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("UPDATE posts SET visibility = ? WHERE id = ? AND user_id = ?", (visibility, post_id, user_id))
+    conn.commit()
+    conn.close()
+    return True

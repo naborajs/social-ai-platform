@@ -10,6 +10,7 @@ class ConversationManager:
     # States
     STATE_NONE = None
     STATE_REG_USERNAME = "REG_USERNAME"
+    STATE_REG_ACCOUNT_TYPE = "REG_ACCOUNT_TYPE"
     STATE_REG_EMAIL = "REG_EMAIL"
     STATE_REG_PASSWORD = "REG_PASSWORD"
     STATE_REG_GENDER = "REG_GENDER"
@@ -60,8 +61,22 @@ class ConversationManager:
 
             # Save username, move to next step
             data['username'] = text
+            set_state(platform_id, platform, self.STATE_REG_ACCOUNT_TYPE, data)
+            return (
+                "👑 [Step 2/7] **Choose your Path!**\n\n"
+                "What kind of account would you like?\n"
+                "1️⃣ **Personal** (Casual AI friendship)\n"
+                "2️⃣ **Professional** (Creator tools & Analytics)\n\n"
+                "_Reply with **1 or 2** to select._"
+            ), None, False
+
+        elif state == self.STATE_REG_ACCOUNT_TYPE:
+            acc_type = "professional" if text == "2" else "personal"
+            data['account_type'] = acc_type
+            data['is_professional'] = 1 if acc_type == "professional" else 0
+            
             set_state(platform_id, platform, self.STATE_REG_EMAIL, data)
-            return "✨ [Step 2/6] **Almost there!**\n\nWhat is your **Email Address**?\n\n_This helps us secure your account and recover it if you ever forget your password._", None, False
+            return "✨ [Step 3/7] **Great choice!**\n\nWhat is your **Email Address**?\n\n_This helps us secure your account and recover it if you ever forget your password._", None, False
 
         elif state == self.STATE_REG_EMAIL:
             # Validate Email
@@ -121,6 +136,7 @@ class ConversationManager:
             from app.core.database import update_system_prompt
             
             # Finalize Registration
+            from app.core.database import set_professional_account
             success, msg = register_user(
                 data['username'], 
                 data['email'], 
@@ -128,14 +144,17 @@ class ConversationManager:
                 platform, 
                 platform_id,
                 avatar_url=data.get('avatar_url'),
-                bio="Member of the TrueFriend Community"
+                bio="Professional Content Creator" if data.get('is_professional') else "Member of the TrueFriend Community"
             )
             
             from app.core.database import get_user_by_platform, set_user_personalization
             user = get_user_by_platform(platform, platform_id)
             if user:
-                update_system_prompt(user[0], system_prompt)
-                set_user_personalization(user[0], gender=data.get('gender'), ai_gender=data.get('ai_gender'))
+                u_id = user[0]
+                update_system_prompt(u_id, system_prompt)
+                set_user_personalization(u_id, gender=data.get('gender'), ai_gender=data.get('ai_gender'))
+                if data.get('is_professional'):
+                    set_professional_account(u_id, 1)
             
             clear_state(platform_id)
             
@@ -157,7 +176,7 @@ class ConversationManager:
         welcome = (
             "🚀 **Welcome to TrueFriend AI**\n\n"
             "I'm about to become your favorite companion, but first, I need a few details to build your unique profile.\n\n"
-            "✨ [Step 1/6] Let's begin!\n"
+            "✨ [Step 1/7] Let's begin!\n"
             "**Choose a unique Username:**"
         )
         return welcome

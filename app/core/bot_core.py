@@ -105,25 +105,22 @@ class UnifiedBot:
     
             elif command == "/help":
                 help_text = (
-                    "💎 *TrueFriend Diamond AI Experience* 💎\n"
-                    "_The Ultimate AI Social Network v4.0_\n\n"
-                    "📢 *Social Feed & Stories*\n"
-                    "• `/post <text>` - Share a public update\n"
-                    "• `/story <text>` - Post a 24h story\n"
-                    "• `/feed` - View world-wide feed 🌎\n"
-                    "• `/stories` - See what's happening\n"
-                    "• `/like <id>` - React to a post\n\n"
-                    "🎮 *Creator & Tools*\n"
-                    "• `/caption <topic>` - Get viral social ideas\n"
-                    "• `/imagine <prompt>` - Generate AI art 🎨\n"
-                    "• `/usage` - View your prestige level\n\n"
-                    "💬 *Social Interaction*\n"
-                    "• `/msg <user> <text>` - Direct message\n"
-                    "• `/chat <user>` - Direct tunnel\n"
-                    "• `/search <name>` - Discover people\n"
-                    "• `/info <user>` - View profile cards\n\n"
+                    "👑 *TrueFriend Creator Edition v5.0* 👑\n"
+                    "_The Professional AI Social Network_\n\n"
+                    "📊 *Creator Dashboard*\n"
+                    "• `/stats` - View your reach & growth\n"
+                    "• `/professional` - Level up to Creator status\n"
+                    "• `/post <text> [--private|--archive]`\n"
+                    "• `/visibility <id> <state>` - Manage posts\n\n"
+                    "🤝 *Follow & Connect*\n"
+                    "• `/follow <user>` - Join a creator's world\n"
+                    "• `/unfollow <user>` - Leave the circle\n"
+                    "• `/notify <user> <on|off>` - Alert prefs\n\n"
+                    "📢 *Social Core*\n"
+                    "• `/feed` | `/stories` | `/post` | `/story`\n"
+                    "• `/search` | `/info` | `/msg` | `/chat`\n\n"
                     "ℹ️ *System*\n"
-                    "• `/settings` | `/help` | `/about` | `/report`"
+                    "• `/settings` | `/help` | `/report`"
                 )
                 return help_text
     
@@ -307,10 +304,26 @@ class UnifiedBot:
                 return self._handle_usage(user_id, username)
 
             if command == "/post":
-                if len(message_parts) < 2: return "❌ Usage: `/post <content>`"
-                from app.core.database import create_post
-                create_post(user_id, " ".join(message_parts[1:]))
-                return "✅ Post shared to the public feed! 🌍"
+                if len(message_parts) < 2: return "❌ Usage: `/post <content> [--private|--archive]`"
+                content = " ".join(message_parts[1:])
+                vis = "public"
+                if "--private" in content:
+                    vis = "private"
+                    content = content.replace("--private", "").strip()
+                elif "--archive" in content:
+                    vis = "archive"
+                    content = content.replace("--archive", "").strip()
+                
+                from app.core.database import create_post, get_follower_ids
+                p_id = create_post(user_id, content, visibility=vis)
+                
+                # Notify followers if public
+                if vis == "public":
+                    follower_ids = get_follower_ids(user_id)
+                    for f_id in follower_ids:
+                        self._notify_follower(f_id, f"🌟 **{username}** just posted: '{content[:30]}...'\nType `/feed` to see it!")
+                
+                return f"✅ Post #{p_id} shared as **{vis.upper()}**! 🌍"
 
             if command == "/story":
                 if len(message_parts) < 2: return "❌ Usage: `/story <content>`"
@@ -319,7 +332,7 @@ class UnifiedBot:
                 return "📸 Story posted! It will expire in 24 hours."
 
             if command == "/feed":
-                return self._handle_feed()
+                return self._handle_feed(user_id)
 
             if command == "/stories":
                 return self._handle_stories()
@@ -344,6 +357,32 @@ class UnifiedBot:
             if command == "/imagine":
                 prompt = " ".join(message_parts[1:]) if len(message_parts) > 1 else "a futuristic city"
                 return self._handle_imagine(user_id, prompt, platform, platform_id)
+
+            if command == "/professional":
+                from app.core.database import set_professional_account
+                set_professional_account(user_id, 1)
+                return "👑 **Welcome to Professional Mode!**\nYou now have access to `/stats` and advanced branding tools."
+
+            if command == "/stats":
+                return self._handle_stats(user_id)
+
+            if command == "/follow":
+                if len(message_parts) < 2: return "❌ Usage: `/follow <username>`"
+                from app.core.database import follow_user
+                success, msg = follow_user(user_id, message_parts[1])
+                return msg
+
+            if command == "/unfollow":
+                if len(message_parts) < 2: return "❌ Usage: `/unfollow <username>`"
+                from app.core.database import unfollow_user
+                success, msg = unfollow_user(user_id, message_parts[1])
+                return msg
+
+            if command == "/visibility":
+                if len(message_parts) < 3: return "❌ Usage: `/visibility <post_id> <public|private|archive>`"
+                from app.core.database import update_post_visibility
+                update_post_visibility(message_parts[1], user_id, message_parts[2].lower())
+                return f"✅ Post #{message_parts[1]} is now **{message_parts[2].upper()}**."
 
             if command == "/search":
                 if len(message_parts) < 2:
@@ -579,9 +618,9 @@ class UnifiedBot:
             f"🕒 **Last Seen**: {row['last_seen']}"
         )
 
-    def _handle_feed(self):
-        """Display the global public feed."""
-        from app.core.database import get_social_feed, get_reactions_count
+    def _handle_feed(self, viewer_id):
+        """Display the global public feed and log views."""
+        from app.core.database import get_social_feed, get_reactions_count, log_post_view
         posts = get_social_feed(limit=10)
         if not posts: return "📭 The feed is empty. Be the first to `/post` something!"
         
@@ -589,6 +628,8 @@ class UnifiedBot:
         for p in posts:
             v = " 💎" if p['is_verified'] else ""
             likes = get_reactions_count(post_id=p['id'])
+            # Log view for analytics
+            log_post_view(p['id'], viewer_id)
             text += f"🆔 #{p['id']} | **{p['username']}**{v}:\n{p['content']}\n❤️ {likes} likes | 🕒 {p['timestamp']}\n\n"
         return text
 
@@ -637,9 +678,57 @@ class UnifiedBot:
              self.queues[platform].put({
                  "platform": platform,
                  "target": platform_id,
-                 "text": f"🎨 **AI Image Generated (v4.0 Diamond Engine)**\n\n_{ai_desc}_"
+                 "text": f"🎨 **AI Image Generated (v5.0 Creator Engine)**\n\n_{ai_desc}_"
              })
         return "✨ Processing your artistic vision in the Diamond Engine... Check your chat in a second!"
+
+    def _handle_stats(self, user_id):
+        """Dashboard for professional creators."""
+        import sqlite3
+        from app.core.config import DB_NAME
+        conn = sqlite3.connect(DB_NAME)
+        c = conn.cursor()
+        
+        # Follower Count
+        c.execute("SELECT COUNT(*) FROM follows WHERE followed_id = ?", (user_id,))
+        followers = c.fetchone()[0]
+        
+        # Total Views across all public posts
+        c.execute('''SELECT COUNT(post_views.id) FROM post_views 
+                     JOIN posts ON post_views.post_id = posts.id 
+                     WHERE posts.user_id = ?''', (user_id,))
+        total_views = c.fetchone()[0]
+        
+        # Recent Post Performance
+        c.execute("SELECT id, content, timestamp FROM posts WHERE user_id = ? ORDER BY id DESC LIMIT 3", (user_id,))
+        recent_posts = c.fetchall()
+        
+        text = "📊 **Creator Analytics Dashboard** 👑\n------------------------------\n"
+        text += f"👥 **Total Followers**: {followers}\n"
+        text += f"👁️ **Total Reach**: {total_views} views\n\n"
+        text += "**Recent Post Performance**:\n"
+        
+        for p_id, content, ts in recent_posts:
+            from app.core.database import get_post_analytics
+            stats = get_post_analytics(p_id)
+            text += f"• #{p_id}: {content[:20]}... | 👁️ {stats['views']} | ❤️ {stats['likes']}\n"
+            
+        conn.close()
+        return text
+
+    def _notify_follower(self, follower_id, text):
+        """Send a silent notify to a follower."""
+        from app.core.database import get_user_by_id
+        u = get_user_by_id(follower_id)
+        if u:
+            pref = u.get('preferred_platform', 'whatsapp')
+            target = u.get('whatsapp_id') if pref == 'whatsapp' else u.get('telegram_id')
+            if target and self.queues and pref in self.queues:
+                self.queues[pref].put({
+                    "platform": pref,
+                    "target": target,
+                    "text": text
+                })
     def _handle_search(self, query):
         """Search for users and present findings."""
         from app.core.database import search_users
